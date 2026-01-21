@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">NavigationSDKDemo</string>
+
+    <string name="do_first">Tip：在导航去目标点之前，需要先新建地图，并在地图上创建一个目标点，然后才能执行导航操作</string>
+    <string name="navigate_to_target_point">导航去目标点</string>
+    <string name="open_navigation_component">打开导航组件</string>
+    <string name="stop_navigating">停止导航</string>
+    <string name="target_point_name">目标点名称</string>
+
+</resources>

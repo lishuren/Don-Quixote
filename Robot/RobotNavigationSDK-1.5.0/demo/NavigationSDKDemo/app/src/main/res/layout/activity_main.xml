@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <TextView
+        android:id="@+id/tv_tip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:text="@string/do_first"/>
+
+
+    <Button
+        android:id="@+id/btn_open_navigation_component"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_tip"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="40dp"
+        android:textSize="16sp"
+        android:text="@string/open_navigation_component"
+        android:onClick="onClick"
+        />
+
+    <EditText
+        android:id="@+id/et_point_name"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/btn_open_navigation_component"
+        android:layout_marginTop="40dp"
+        android:layout_centerHorizontal="true"
+        android:hint="@string/target_point_name"
+        />
+
+    <Button
+        android:id="@+id/btn_navigate_to_target_point"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/et_point_name"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp"
+        android:textSize="16sp"
+        android:text="@string/navigate_to_target_point"
+        android:onClick="onClick"
+        />
+
+    <Button
+        android:id="@+id/btn_stop_navigating"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/btn_navigate_to_target_point"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="40dp"
+        android:textSize="16sp"
+        android:text="@string/stop_navigating"
+        android:onClick="onClick"
+        />
+
+</RelativeLayout>

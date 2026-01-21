@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">NavigationSDKDemo</string>
+
+    <string name="do_first">Tip: Before navigating to the target point, you need to create a new map and create a target point on the map before you can perform the navigation operation</string>
+    <string name="navigate_to_target_point">Navigate to the target point</string>
+    <string name="open_navigation_component">Open navigation components</string>
+    <string name="stop_navigating">Stop navigating</string>
+    <string name="target_point_name">Target point name</string>
+
+</resources>
