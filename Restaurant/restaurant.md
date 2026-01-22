@@ -1,4 +1,4 @@
-# Restaurant Robot Integration: System Analysis & Plan
+# Restaurant Direction Assistant System: Analysis & Plan
 
 ## 1. System Architecture & ROI Estimation (Simulation Phase)
 Based on team discussions, the project includes a critical **Simulation & Estimation Phase** before physical deployment to validate layouts and costs.
@@ -19,20 +19,47 @@ Based on team discussions, the project includes a critical **Simulation & Estima
 
 ---
 
-## 2. Core Data Management & APIs
-Reflecting the system architecture, the software manages three primary entities using centralized APIs.
+## 2. Core Operational Entities & Roles
+Reflecting the system architecture and workflow, the simulation manages the following key entities:
 
-### A. Tables
-*   **APIs:** `getListTables()`, `setTable(id, properties)`, `getTableState()`
-*   **State Tracking:** Real-time visibility of table status (Occupied, Dirty, Available).
+### A. Guest
+*   **Role:** The customer requiring service.
+*   **Properties:** Group size, patience level, eating duration.
+*   **Lifecycle:** `Arrival (Reception)` -> `Escort (Robot)` -> `Seating (Table)` -> `Dining` -> `Departure (Exit)` (triggering "Dirty Table" state).
 
-### B. Robots (Bots)
-*   **APIs:** `getListBots()`, `setBotTask(id, task)`, `getRoutingMap()`
-*   **Management:** Centralized dispatching and task queue management.
+### B. Robot (The Waiter)
+*   **Role:** The autonomous agent performing physical transport tasks.
+*   **Properties:** Battery level, current payload, state (Idle, Moving, Blocked), location.
+*   **Task Queue:** Receives tasks from the Central Dispatcher (e.g., "Go to Dispensing Counter", "Go to Table 5").
 
-### C. Guests
-*   **APIs:** `getListGuests()`, `setGuestNumber(count)`
-*   **Flow:** Simulating or tracking guest arrival rates to stress-test the routing algorithms.
+### C. Table
+*   **Role:** The physical destination for guests and deliveries.
+*   **Properties:** ID, capacity (seats), location coordinates.
+*   **State Machine:** `Available` -> `Occupied (Waiting)` -> `Occupied (Eating)` -> `Dirty` -> `Available`.
+
+### D. Dispensing Counter (Kitchen / Bar)
+*   **Role:** The origin point for food and drink deliveries.
+*   **Function:**
+    *   **Order Queue:** Holds prepared items waiting for a robot.
+    *   **Interaction:** Staff loads the robot here and confirms logic dispatch.
+
+### E. Pick-up Counter (Dish Return / Wash Station)
+*   **Role:** The destination for used tableware and trash.
+*   **Function:**
+    *   **Unloading:** Robot arrives here full of dirty dishes.
+    *   **Interaction:** Staff unloads the robot and releases it back to the "Idle" pool.
+
+### F. Reception / Entrance & Exit
+*   **Role:** The boundary of the simulation world.
+*   **Function:**
+    *   **Guest Source/Sink:** Simulates guests arriving (queueing) and leaving (freeing up the table).
+    *   **Escort Start Point:** Robots meet new guests here to lead them to tables.
+
+### G. Restrooms (Target Point)
+*   **Role:** A specific navigation target for guests.
+*   **Function:**
+    *   **Guidance Destination:** Robots may receive requests to guide guests here ("Follow me to the restrooms").
+    *   **Patrol Point:** Robots may cruise by to check for cleaning needs.
 
 ---
 
