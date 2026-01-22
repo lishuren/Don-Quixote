@@ -25,41 +25,34 @@ Reflecting the system architecture and workflow, the simulation manages the foll
 ### A. Guest
 *   **Role:** The customer requiring service.
 *   **Properties:** Group size, patience level, eating duration.
-*   **Lifecycle:** `Arrival (Reception)` -> `Escort (Robot)` -> `Seating (Table)` -> `Dining` -> `Departure (Exit)` (triggering "Dirty Table" state).
+*   **Lifecycle:** `Arrival (Door)` -> `Escort` -> `Seating` -> `Dining` -> `Payment` -> `Departure (Door)`.
 
 ### B. Robot (The Waiter)
 *   **Role:** The autonomous agent performing physical transport tasks.
 *   **Properties:** Battery level, current payload, state (Idle, Moving, Blocked), location.
-*   **Task Queue:** Receives tasks from the Central Dispatcher (e.g., "Go to Dispensing Counter", "Go to Table 5").
+*   **Task Queue:** Receives tasks from the Central Dispatcher.
 
 ### C. Table
-*   **Role:** The physical destination for guests and deliveries.
-*   **Properties:** ID, capacity (seats), location coordinates.
-*   **State Machine:** `Available` -> `Occupied (Waiting)` -> `Occupied (Eating)` -> `Dirty` -> `Available`.
+*   **Role:** The physical destination for dining.
+*   **State Machine:** `Available` -> `Occupied` -> `Dirty` -> `Available`.
 
-### D. Dispensing Counter (Kitchen / Bar)
-*   **Role:** The origin point for food and drink deliveries.
-*   **Function:**
-    *   **Order Queue:** Holds prepared items waiting for a robot.
-    *   **Interaction:** Staff loads the robot here and confirms logic dispatch.
+### D. Service Hub (The Kitchen & Dish Pit)
+*   **Role:** The central point for robot operations (The "Third Place").
+*   **Functions:**
+    *   **Food Pickup (Dispensing):** Robot loads prepared meals (Kitchen -> Table).
+    *   **Dish Return:** Robot unloads dirty tableware (Table -> Wash Station).
 
-### E. Pick-up Counter (Dish Return / Wash Station)
-*   **Role:** The destination for used tableware and trash.
-*   **Function:**
-    *   **Unloading:** Robot arrives here full of dirty dishes.
-    *   **Interaction:** Staff unloads the robot and releases it back to the "Idle" pool.
+### E. Reception (The Door)
+*   **Role:** The "First Place" where guests step in.
+*   **Function:** Guest spawning, queueing, and escort start point.
 
-### F. Reception / Entrance & Exit
-*   **Role:** The boundary of the simulation world.
-*   **Function:**
-    *   **Guest Source/Sink:** Simulates guests arriving (queueing) and leaving (freeing up the table).
-    *   **Escort Start Point:** Robots meet new guests here to lead them to tables.
+### F. Cashier (Payment Station)
+*   **Role:** The "Second Place" for finalizing service.
+*   **Function:** Guests pay here before leaving (Dining -> Payment -> Exit).
 
 ### G. Restrooms (Target Point)
 *   **Role:** A specific navigation target for guests.
-*   **Function:**
-    *   **Guidance Destination:** Robots may receive requests to guide guests here ("Follow me to the restrooms").
-    *   **Patrol Point:** Robots may cruise by to check for cleaning needs.
+*   **Function:** Guidance destination ("Follow me to the restrooms").
 
 ---
 
