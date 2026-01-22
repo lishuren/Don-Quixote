@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { VegaFlex, VegaFont, VegaBox } from '@heartlandone/vega-react';
+import { VegaFlex, VegaFont, VegaBox, VegaDivider } from '@heartlandone/vega-react';
 import RobotMap from './components/RobotMap';
 import ControlPanel from './components/ControlPanel';
 import HeadBar from './components/HeadBar';
@@ -40,6 +40,7 @@ function App() {
           <VegaFont variant="font-h3">🤖 RoboRunner - Delivery Robot Simulator</VegaFont>
           <HeadBar />
         </VegaFlex>
+        <VegaDivider />
         <VegaBox width={'100%'}>
           <VegaFlex gap="size-20" justifyContent={"space-between"}>
             <VegaBox width="100%" flex={1}>
