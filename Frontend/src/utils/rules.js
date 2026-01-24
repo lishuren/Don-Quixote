@@ -29,12 +29,12 @@ export const DEFAULT_TABLE_MIX = {
  */
 const MapConfig = {
   // Map dimensions
-  mapWidth: 900,
+  mapWidth: 1200,
   mapHeight: 600,
 
   // Aisle widths
-  mainAisle: 120,
-  minorAisle: 90,
+  mainAisle: 60,
+  minorAisle: 30,
 
   // Buffers
   safetyBuffer: 10,
@@ -50,10 +50,10 @@ const MapConfig = {
 
   // Fixed zones (positions relative to map)
   zones: {
-    kitchen: { x: 50, y: 500, width: 120, height: 80, label: 'Kitchen', color: '#FF5722' },
-    reception: { x: 750, y: 20, width: 130, height: 60, label: 'Reception', color: '#9C27B0' },
-    cashier: { x: 750, y: 100, width: 130, height: 60, label: 'Cashier', color: '#3F51B5' },
-    restrooms: { x: 750, y: 500, width: 130, height: 80, label: 'Restrooms', color: '#607D8B' },
+    kitchen: { x: 50, y: 500, width: 60, height: 40, label: 'Kitchen', color: '#FF5722' },
+    reception: { x: 750, y: 20, width: 60, height: 30, label: 'Reception', color: '#9C27B0' },
+    cashier: { x: 750, y: 100, width: 60, height:40, label: 'Cashier', color: '#3F51B5' },
+    restrooms: { x: 750, y: 500, width: 60, height: 40, label: 'Restrooms', color: '#607D8B' },
   },
 
   // Dining area boundaries (auto-calculated based on fixed zones)
@@ -162,12 +162,11 @@ export function validateConfig(userConfig = {}) {
  */
 function calculateDiningArea(config) {
   const padding = 20;
-  const rightZoneWidth = 150;
   return {
     x: padding,
     y: padding,
-    width: config.mapWidth - rightZoneWidth - padding * 2,
-    height: config.mapHeight - 120 - padding,
+    width: config.mapWidth - padding * 2,
+    height: config.mapHeight - padding * 2,
   };
 }
 
@@ -177,12 +176,12 @@ function calculateDiningArea(config) {
  * @returns {Object} Zone positions
  */
 function calculateZonePositions(config) {
-  const { mapWidth, mapHeight } = config;
+  const { diningArea } = config;
   return {
-    kitchen: { x: 50, y: mapHeight - 100, width: 120, height: 80, label: 'Kitchen', color: '#FF5722' },
-    reception: { x: mapWidth - 150, y: 20, width: 130, height: 60, label: 'Reception', color: '#9C27B0' },
-    cashier: { x: mapWidth - 150, y: 100, width: 130, height: 60, label: 'Cashier', color: '#3F51B5' },
-    restrooms: { x: mapWidth - 150, y: mapHeight - 100, width: 130, height: 80, label: 'Restrooms', color: '#607D8B' },
+    kitchen: { x: 50, y: diningArea.height - 20, width: 100, height: 30, label: 'Kitchen', color: '#FF5722' },
+    reception: { x: 150, y: -5, width: 100, height: 30, label: 'Reception', color: '#9C27B0' },
+    cashier: { x: 300, y: -5, width: 100, height: 30, label: 'Cashier', color: '#3F51B5' },
+    restrooms: { x: diningArea.width/2 + 150, y: diningArea.height - 20, width: 100, height: 30, label: 'Restrooms', color: '#607D8B' },
   };
 }
 
