@@ -34,7 +34,12 @@ Reflecting the system architecture and workflow, the simulation manages the foll
 
 ### C. Table
 *   **Role:** The physical destination for dining.
-*   **State Machine:** `Available` -> `Occupied` -> `Dirty` -> `Available`.
+*   **State Machine:**
+    1.  **AVAILABLE:** Clean, sanitized, and ready for assignment. (Action: Allocator finds table -> Robot Escort).
+    2.  **OCCUPIED_SEATED:** Guests seated, waiting for food. (Action: Ready for Food Delivery).
+    3.  **OCCUPIED_DINING:** Acting as "Do Not Disturb". (Action: Patrol mode only).
+    4.  **DIRTY:** Guests have moved to Cashier; table needs bussing. (Action: Triggers "Dish Return" task).
+    5.  **CLEANING:** Staff is wiping down. (Blocked from assignment).
 
 ### D. Service Hub (The Kitchen & Dish Pit)
 *   **Role:** The central point for robot operations (The "Third Place").
