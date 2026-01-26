@@ -7,20 +7,20 @@
  * Default table sizes (diameter in pixels) by capacity
  */
 export const TABLE_SIZES = {
-  t2: 70,
-  t4: 90,
-  t6: 110,
-  t8: 130,
+  t2: 60,
+  t4: 80,
+  t6: 100,
+  t8: 120,
 };
 
 /**
  * Default table mix distribution
  */
 export const DEFAULT_TABLE_MIX = {
-  t2: 1,
-  t4: 6,
-  t6: 2,
-  t8: 1,
+  t2: 5,
+  t4: 10,
+  t6: 3,
+  t8: 2,
 };
 
 /**
@@ -33,12 +33,12 @@ const MapConfig = {
   mapHeight: 600,
 
   // Aisle widths
-  mainAisle: 60,
-  minorAisle: 30,
+  mainAisle: 40,
+  minorAisle: 20,
 
   // Buffers
-  safetyBuffer: 10,
-  seatBuffer: 20,
+  safetyBuffer: 60,
+  seatBuffer: 40,
 
   // Table configuration
   tableShape: 'rect', // 'rect' | 'round' | 'square'
@@ -46,7 +46,7 @@ const MapConfig = {
   tableMix: { ...DEFAULT_TABLE_MIX },
 
   // Grid resolution for pathfinding
-  gridSize: 20,
+  gridSize: 10,
 
   // Fixed zones (positions relative to map)
   zones: {
@@ -69,7 +69,7 @@ const MapConfig = {
  * Validation bounds for config parameters
  */
 const BOUNDS = {
-  tableCount: { min: 2, max: 50 },
+  tableCount: { min: 1, max: 50 },
   mainAisle: { min: 80, max: 200 },
   minorAisle: { min: 60, max: 150 },
   safetyBuffer: { min: 5, max: 30 },
@@ -161,12 +161,11 @@ export function validateConfig(userConfig = {}) {
  * @returns {Object} Dining area bounds {x, y, width, height}
  */
 function calculateDiningArea(config) {
-  const padding = 20;
   return {
-    x: padding,
-    y: padding,
-    width: config.mapWidth - padding * 2,
-    height: config.mapHeight - padding * 2,
+    x: 0,
+    y: 0,
+    width: config.mapWidth,
+    height: config.mapHeight,
   };
 }
 
@@ -178,10 +177,10 @@ function calculateDiningArea(config) {
 function calculateZonePositions(config) {
   const { diningArea } = config;
   return {
-    kitchen: { x: 50, y: diningArea.height - 20, width: 100, height: 30, label: 'Kitchen', color: '#FF5722' },
-    reception: { x: 150, y: -5, width: 100, height: 30, label: 'Reception', color: '#9C27B0' },
-    cashier: { x: 300, y: -5, width: 100, height: 30, label: 'Cashier', color: '#3F51B5' },
-    restrooms: { x: diningArea.width/2 + 150, y: diningArea.height - 20, width: 100, height: 30, label: 'Restrooms', color: '#607D8B' },
+    kitchen: { x: 50, y: diningArea.height - 30, width: 100, height: 30, label: 'Kitchen', color: '#FF5722' },
+    reception: { x: 150, y: 0, width: 100, height: 30, label: 'Reception', color: '#9C27B0' },
+    cashier: { x: 300, y: 0, width: 100, height: 30, label: 'Cashier', color: '#3F51B5' },
+    restrooms: { x: diningArea.width/2 + 150, y: diningArea.height - 30, width: 100, height: 30, label: 'Restrooms', color: '#607D8B' },
   };
 }
 
@@ -199,6 +198,7 @@ export function validateTableCount(count) {
  * @returns {Object} Bounds object
  */
 export function getBounds() {
+  console.log("Providing validation bounds:", BOUNDS);
   return { ...BOUNDS };
 }
 

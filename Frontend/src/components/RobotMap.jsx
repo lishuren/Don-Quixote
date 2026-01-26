@@ -1,347 +1,421 @@
 /**
  * @file RobotMap.jsx
- * @description Restaurant map component with auto-generated layout and pathfinding
+ * @description Konva-based restaurant map simulator with three robots + guest and MockAPI-like step logic
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
+import { Stage, Layer, Rect, Circle, Text, Group, Line } from 'react-konva';
 import { VegaCard } from '@heartlandone/vega-react';
 import { generateTableLayout, getMainAisles, getKitchenPosition } from '../utils/layoutGenerator.js';
-import { buildGrid, findPath, getObstacles } from '../utils/pathfinding.js';
+import { postMap, planRoute, getMap } from '../utils/apiClient.js';
+import { buildMapPayload, defaultStartBottomRight } from '../utils/mapSerializer.js';
+// Local pathfinding removed; backend planning used exclusively
+
+// Simulation parameters (can later be wired to Redux/props)
+const DEFAULT_SPEED = 80; // px/s base speed per robot
+const ROBOT_RADIUS = 16;
+
+function getZoneCenter(zones, key) {
+  const z = zones[key];
+  if (!z) return { x: 0, y: 0 };
+  return { x: z.x + z.width / 2, y: z.y + z.height / 2 };
+}
+
+// Path helpers -------------------------------------------------------------
+function buildPathMetrics(points) {
+  if (!points || points.length === 0) {
+    return { points: [], segmentLengths: [], totalLength: 0 };
+  }
+
+  const segmentLengths = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    const dy = points[i + 1].y - points[i].y;
+    const len = Math.hypot(dx, dy);
+    segmentLengths.push(len);
+    total += len;
+  }
+  return { points, segmentLengths, totalLength: total };
+}
+
+function pointAlongPath(path, distance) {
+  const { points, segmentLengths, totalLength } = path;
+  if (!points.length) return null;
+  if (distance <= 0) return points[0];
+  if (distance >= totalLength) return points[points.length - 1];
+
+  let remaining = distance;
+  for (let i = 0; i < segmentLengths.length; i++) {
+    const segLen = segmentLengths[i];
+    if (remaining > segLen) {
+      remaining -= segLen;
+    } else {
+      const t = remaining / segLen;
+      const a = points[i];
+      const b = points[i + 1];
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+      };
+    }
+  }
+  return points[points.length - 1];
+}
 
 /**
- * RobotMap component - renders restaurant floor plan with robot animation
- * @param {Object} props - Component props
- * @param {boolean} props.isRunning - Whether animation is running
- * @param {Function} props.onRouteComplete - Callback when route animation completes
- * @param {string} props.currentAction - Current action type (Order, Call, etc.)
- * @param {number|null} props.selectedTable - Selected table ID for delivery
- * @param {Function} props.onTableSelect - Callback when a table is selected
- * @param {boolean} props.isPaused - Whether animation is paused
+ * RobotMap component - Konva-based simulator
  */
-function RobotMap({ 
-  isRunning, 
-  onRouteComplete, 
-  currentAction, 
+function RobotMap({
+  isRunning,
+  onRouteComplete,
+  currentAction,
   selectedTable,
   onTableSelect,
-  isPaused = false
+  isPaused = false,
 }) {
   const { config, tableCount, speedRate } = useSelector((state) => state);
-  
-  const [robotPosition, setRobotPosition] = useState(null);
-  const [currentPath, setCurrentPath] = useState([]);
-  const [pathIndex, setPathIndex] = useState(0);
-  
-  const animationRef = useRef(null);
-  const lastTimeRef = useRef(0);
-  const isPausedRef = useRef(isPaused);
 
-  // Update pause ref
+  const isPausedRef = useRef(isPaused);
+  const lastTimeRef = useRef(0);
+  const frameRef = useRef(null);
+  const worldRef = useRef(null);
+  const isRunningRef = useRef(isRunning);
+  const speedRateRef = useRef(speedRate);
+  const safetyBufferRef = useRef(config.safetyBuffer);
+  const lastPathPointRef = useRef();
+
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  // Memoize table layout
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  useEffect(() => {
+    speedRateRef.current = speedRate;
+  }, [speedRate]);
+
+  useEffect(() => {
+    safetyBufferRef.current = config.safetyBuffer;
+  }, [config.safetyBuffer]);
+
+  // Layout --------------------------------------------------------------
   const tables = useMemo(() => {
     return generateTableLayout(config, tableCount);
   }, [config, tableCount]);
 
-  // Memoize main aisles
-  const aisles = useMemo(() => {
-    return getMainAisles(config);
-  }, [config]);
+  const aisles = useMemo(() => getMainAisles(config), [config]);
 
-  // Memoize kitchen position
-  const kitchenPos = useMemo(() => {
-    return getKitchenPosition(config);
-  }, [config]);
+  const kitchenPos = useMemo(() => getKitchenPosition(config), [config]);
+  const receptionPos = useMemo(
+    () => getZoneCenter(config.zones, 'reception'),
+    [config.zones]
+  );
 
-  // Initialize robot at kitchen
-  useEffect(() => {
-    setRobotPosition(kitchenPos);
-  }, [kitchenPos]);
-
-  // Build pathfinding grid when layout changes
-  const obstacles = useMemo(() => {
-    return getObstacles(tables, config.zones, config.safetyBuffer);
-  }, [tables, config.zones, config.safetyBuffer]);
 
   useEffect(() => {
-    buildGrid(
-      { width: config.mapWidth, height: config.mapHeight },
-      obstacles,
-      config.gridSize
-    );
-  }, [config.mapWidth, config.mapHeight, obstacles, config.gridSize]);
+    // No-op: uploading map happens on Start
+  }, [config, tables]);
 
-  // Calculate path when selectedTable changes and isRunning
-  useEffect(() => {
-    if (isRunning && selectedTable && robotPosition) {
-      const targetTable = tables.find(t => t.id === selectedTable);
-      if (targetTable) {
-        // Path: Kitchen → Table → Kitchen
-        const pathToTable = findPath(kitchenPos, targetTable.center);
-        const pathBack = findPath(targetTable.center, kitchenPos);
-        
-        const fullPath = [...pathToTable, ...pathBack.slice(1)];
-        setCurrentPath(fullPath);
-        setPathIndex(0);
-        setRobotPosition(kitchenPos);
+    // Local obstacle grid disabled; backend handles avoidance
+
+  // Robot state from backend plan --------------------------------------
+  const [robotPath, setRobotPath] = useState(buildPathMetrics([]));
+  const [distanceAlong, setDistanceAlong] = useState(0);
+  const [mapId, setMapId] = useState(null);
+
+  const initializeWorld = useCallback(async () => {
+    // Upload current map to backend whenever Start is pressed (always)
+    try {
+      debugger
+      const payload = buildMapPayload(config, tables);
+      console.log('Start pressed: posting map payload to backend');
+      const upload = await postMap(payload);
+      if (upload && upload.mapId) {
+        console.log('Map uploaded with mapId:', upload.mapId);
+        setMapId(upload.mapId);
       }
+    } catch (e) {
+      console.warn('postMap on start failed:', e);
     }
-  }, [isRunning, selectedTable, tables, kitchenPos]);
 
-  // Animation loop
+    // If we have no tables, skip planning but keep robot idle
+    if (!tables || tables.length === 0) {
+      console.warn('No tables available; skipping planning after map upload');
+      setRobotPath(buildPathMetrics([]));
+      setDistanceAlong(0);
+      lastTimeRef.current = 0;
+      return;
+    }
+
+  }, [tables, selectedTable, receptionPos, kitchenPos, config]);
+
+
+  const triggerReplan = async () => {
+    if(!selectedTable) return;
+    const targetTableA = tables.find((t) => t.id === selectedTable) || tables[9];
+    
+    // Removed local ensurePath fallback; use backend plan only
+
+    // Try server-side planning from bottom-right to target table
+    let serverPath = null;
+    try {
+      let start = null;
+      if (lastPathPointRef.current) {
+        start = lastPathPointRef.current;
+      } else {
+        start = defaultStartBottomRight(config);
+      }
+      console.log('Planning route for table:', targetTableA?.id);
+      const res = await planRoute({ 
+        start, tableId: String(targetTableA.id), robotRadius: 16, 
+        dockSide: "Bottom", 
+        dockOffset: 16
+
+      });
+      if (res && res.success && Array.isArray(res.path) && res.path.length > 1) {
+        serverPath = res.path.map(p => ({ x: p.x, y: p.y }));
+        console.log('Received planned path points:', serverPath.length);
+        lastPathPointRef.current = serverPath[serverPath.length - 1];
+      } else {
+        console.warn('Plan response unsuccessful or empty:', res);
+      }
+    } catch (e) {
+      console.warn('planRoute failed:', e);
+    }
+
+    const pathMetrics = buildPathMetrics(serverPath || []);
+    setRobotPath(pathMetrics);
+    setDistanceAlong(0);
+    lastTimeRef.current = 0;
+  }
+
+  useEffect(() => {
+    triggerReplan();
+  }, [selectedTable]);
+
+
+  useEffect(() => {
+    if (selectedTable == null) return;
+    
+  }, [selectedTable])
+
+  useEffect(() => {
+    debugger
+    if (isRunning) {
+      initializeWorld();
+    }
+  }, [isRunning, initializeWorld]);
+
+  // Animation loop ------------------------------------------------------
   const animate = useCallback((timestamp) => {
     if (!lastTimeRef.current) {
       lastTimeRef.current = timestamp;
     }
-
-    if (isPausedRef.current) {
-      animationRef.current = requestAnimationFrame(animate);
+    const dtMs = timestamp - lastTimeRef.current;
+    lastTimeRef.current = timestamp;
+    if (!isRunningRef.current || isPausedRef.current) {
+      frameRef.current = requestAnimationFrame(animate);
       return;
     }
+    const dtSec = dtMs / 1000;
+    setDistanceAlong((d) => Math.min(d + DEFAULT_SPEED * speedRateRef.current * dtSec, robotPath.totalLength));
+    frameRef.current = requestAnimationFrame(animate);
+  }, [robotPath.totalLength]);
 
-    const deltaTime = timestamp - lastTimeRef.current;
-    lastTimeRef.current = timestamp;
-
-    setPathIndex((prevIndex) => {
-      if (prevIndex >= currentPath.length - 1) {
-        onRouteComplete?.();
-        setCurrentPath([]);
-        return 0;
-      }
-
-      const speed = 3 * speedRate * (deltaTime / 16); // Base speed adjusted by rate
-      const current = currentPath[prevIndex];
-      const next = currentPath[prevIndex + 1];
-
-      if (!current || !next) return prevIndex;
-
-      const dx = next.x - current.x;
-      const dy = next.y - current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance <= speed) {
-        setRobotPosition(next);
-        return prevIndex + 1;
-      } else {
-        const ratio = speed / distance;
-        setRobotPosition((prev) => ({
-          x: prev.x + dx * ratio,
-          y: prev.y + dy * ratio,
-        }));
-        return prevIndex;
-      }
-    });
-
-    animationRef.current = requestAnimationFrame(animate);
-  }, [currentPath, speedRate, onRouteComplete]);
-
-  // Start/stop animation
   useEffect(() => {
-    if (isRunning && currentPath.length > 0) {
-      lastTimeRef.current = 0;
-      animationRef.current = requestAnimationFrame(animate);
-    }
-
+    frameRef.current = requestAnimationFrame(animate);
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [isRunning, currentPath, animate]);
+  }, [animate]);
+
+  // Notify when robot finished
+  useEffect(() => {
+    if (robotPath.totalLength > 0 && distanceAlong >= robotPath.totalLength) {
+      onRouteComplete?.();
+    }
+  }, [robotPath.totalLength, distanceAlong, onRouteComplete]);
 
   const { mapWidth, mapHeight, zones, diningArea } = config;
+  const robotPos = useMemo(() => pointAlongPath(robotPath, distanceAlong), [robotPath, distanceAlong]);
+  console.log("robotPos", robotPos)
 
   return (
-    <VegaCard padding="size-16" style={{ height: "100%", overflow: "hidden" }}>
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox={`0 0 ${mapWidth} ${mapHeight}`}
-        style={{ maxHeight: '100%' }}
-      >
-        {/* Background */}
-        <rect x="0" y="0" width={mapWidth} height={mapHeight} fill="#f5f5f5" />
+    <VegaCard padding="size-16" style={{ height: '100%', overflow: 'hidden' }}>
+      <Stage width={mapWidth} height={mapHeight}>
+        <Layer>
+          {/* Background */}
+          <Rect x={0} y={0} width={mapWidth} height={mapHeight} fill="#f5f5f5" />
 
-        {/* Dining area */}
-        <rect
-          x={diningArea.x}
-          y={diningArea.y}
-          width={diningArea.width}
-          height={diningArea.height}
-          fill="#fff9e6"
-          stroke="#ddd"
-          strokeWidth="1"
-        />
-
-        {/* Main aisles (cross pattern) */}
-        <rect
-          x={aisles.horizontal.x}
-          y={aisles.horizontal.y}
-          width={aisles.horizontal.width}
-          height={aisles.horizontal.height}
-          fill="none"
-          stroke="#ccc"
-          strokeWidth="2"
-          strokeDasharray="10,5"
-        />
-        <rect
-          x={aisles.vertical.x}
-          y={aisles.vertical.y}
-          width={aisles.vertical.width}
-          height={aisles.vertical.height}
-          fill="none"
-          stroke="#ccc"
-          strokeWidth="2"
-          strokeDasharray="10,5"
-        />
-
-        {/* Fixed zones */}
-        {Object.entries(zones).map(([key, zone]) => (
-          <g key={key}>
-            <rect
-              x={zone.x}
-              y={zone.y}
-              width={zone.width}
-              height={zone.height}
-              fill={zone.color}
-              rx="5"
-            />
-            <text
-              x={zone.x + zone.width / 2}
-              y={zone.y + zone.height / 2 + 5}
-              textAnchor="middle"
-              fill="white"
-              fontSize="14"
-              fontWeight="bold"
-            >
-              {zone.label}
-            </text>
-          </g>
-        ))}
-
-        {/* Draw route path */}
-        {currentPath.length > 1 && (
-          <polyline
-            points={currentPath.map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="#4CAF50"
-            strokeWidth="3"
-            strokeDasharray="8,4"
-            opacity="0.7"
+          {/* Dining area */}
+          <Rect
+            x={diningArea.x}
+            y={diningArea.y}
+            width={diningArea.width}
+            height={diningArea.height}
+            fill="#fff9e6"
+            stroke="#ddd"
+            strokeWidth={1}
           />
-        )}
 
-        {/* Draw tables */}
-        {tables.map(table => {
-          const isSelected = selectedTable === table.id;
-          const fillColor = isSelected ? '#5D4037' : '#8B4513';
-          
-          return (
-            <g 
-              key={table.id} 
-              onClick={() => onTableSelect?.(table.id)}
-              style={{ cursor: 'pointer' }}
-            >
-              {table.shape === 'round' ? (
-                <circle
-                  cx={table.center.x}
-                  cy={table.center.y}
-                  r={table.radius}
-                  fill={fillColor}
-                  stroke={isSelected ? '#FFD700' : 'none'}
-                  strokeWidth={isSelected ? 4 : 0}
-                />
-              ) : table.shape === 'rect' ? (
-                <rect
-                  x={table.center.x - table.rectWidth / 2}
-                  y={table.center.y - table.rectHeight / 2}
-                  width={table.rectWidth}
-                  height={table.rectHeight}
-                  fill={fillColor}
-                  rx="5"
-                  stroke={isSelected ? '#FFD700' : 'none'}
-                  strokeWidth={isSelected ? 4 : 0}
-                />
-              ) : (
-                <rect
-                  x={table.center.x - table.side / 2}
-                  y={table.center.y - table.side / 2}
-                  width={table.side}
-                  height={table.side}
-                  fill={fillColor}
-                  rx="5"
-                  stroke={isSelected ? '#FFD700' : 'none'}
-                  strokeWidth={isSelected ? 4 : 0}
-                />
-              )}
-              <text
-                x={table.center.x}
-                y={table.center.y + 5}
-                textAnchor="middle"
+          {/* Main aisles (cross pattern) */}
+          <Rect
+            x={aisles.horizontal.x}
+            y={aisles.horizontal.y}
+            width={aisles.horizontal.width}
+            height={aisles.horizontal.height}
+            stroke="#ccc"
+            strokeWidth={2}
+            dash={[10, 5]}
+          />
+          <Rect
+            x={aisles.vertical.x}
+            y={aisles.vertical.y}
+            width={aisles.vertical.width}
+            height={aisles.vertical.height}
+            stroke="#ccc"
+            strokeWidth={2}
+            dash={[10, 5]}
+          />
+
+          {/* Fixed zones */}
+          {Object.entries(zones).map(([key, zone]) => (
+            <Group key={key}>
+              <Rect
+                x={zone.x}
+                y={zone.y}
+                width={zone.width}
+                height={zone.height}
+                fill={zone.color}
+                cornerRadius={5}
+              />
+              <Text
+                x={zone.x}
+                y={zone.y + zone.height / 2 - 8}
+                width={zone.width}
+                align="center"
                 fill="white"
-                fontSize="12"
-                fontWeight="bold"
-              >
-                T{table.id}
-              </text>
-              {/* Capacity indicator */}
-              <text
-                x={table.center.x}
-                y={table.center.y + 18}
-                textAnchor="middle"
-                fill="white"
-                fontSize="9"
-                opacity="0.8"
-              >
-                ({table.capacity})
-              </text>
-            </g>
-          );
-        })}
+                fontSize={14}
+                fontStyle="bold"
+                text={zone.label}
+              />
+            </Group>
+          ))}
 
-        {/* Draw robot */}
-        {robotPosition && (
-          <g transform={`translate(${robotPosition.x}, ${robotPosition.y})`}>
-            <circle r="18" fill="#2196F3" stroke="#1565C0" strokeWidth="2" />
-            <text
-              y="6"
-              textAnchor="middle"
-              fill="white"
-              fontSize="18"
-            >
-              🤖
-            </text>
-          </g>
-        )}
+          {/* Tables */}
+          {tables.map((table) => {
+            const isSelected = selectedTable === table.id;
+            const fillColor = isSelected ? '#5D4037' : '#8B4513';
+            const strokeColor = isSelected ? '#FFD700' : 'transparent';
 
-        {/* Status indicator */}
-        {isRunning && currentAction && (
-          <g>
-            <rect
-              x={mapWidth / 2 - 80}
-              y={10}
-              width={160}
-              height={30}
-              fill="rgba(33, 150, 243, 0.9)"
-              rx="15"
-            />
-            <text
-              x={mapWidth / 2}
-              y={30}
-              textAnchor="middle"
-              fill="white"
-              fontSize="12"
-              fontWeight="bold"
-            >
-              {currentAction} → T{selectedTable}
-            </text>
-          </g>
-        )}
-      </svg>
+            if (table.shape === 'round') {
+              const cx = table.x + (table.radius || table.width / 2);
+              const cy = table.y + (table.radius || table.height / 2);
+              const r = table.radius || Math.min(table.width, table.height) / 2;
+              return (
+                <Group
+                  key={table.id}
+                  onClick={() => onTableSelect?.(table.id)}
+                >
+                  <Circle
+                    x={cx}
+                    y={cy}
+                    radius={r}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={4}
+                  />
+                  <Text
+                    x={table.x}
+                    y={table.y + (table.height / 2) - 6}
+                    width={table.width}
+                    align="center"
+                    fill="white"
+                    fontSize={12}
+                    fontStyle="bold"
+                    text={`T${table.id}` + (table.capacity ? `(${table.capacity})` : '')}
+                  />
+                </Group>
+              );
+            }
+
+            if (table.shape === 'rect') {
+              return (
+                <Group
+                  key={table.id}
+                  onClick={() => onTableSelect?.(table.id)}
+                >
+                  <Rect
+                    x={table.x}
+                    y={table.y}
+                    width={table.width}
+                    height={table.height}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={4}
+                    cornerRadius={5}
+                  />
+                  <Text
+                    x={table.x}
+                    y={table.y + (table.height / 2) - 8}
+                    width={table.width}
+                    align="center"
+                    fill="white"
+                    fontSize={12}
+                    fontStyle="bold"
+                    text={`T${table.id}` + (table.capacity ? `(${table.capacity})` : '')}
+                  />
+                </Group>
+              );
+            }
+
+            // square fallback (or other shapes with width/height)
+            return (
+              <Group
+                key={table.id}
+                onClick={() => onTableSelect?.(table.id)}
+              >
+                <Rect
+                  x={table.x}
+                  y={table.y}
+                  width={table.width}
+                  height={table.height}
+                  fill={fillColor}
+                  stroke={strokeColor}
+                  strokeWidth={4}
+                  cornerRadius={5}
+                />
+                <Text
+                  x={table.x}
+                  y={table.y + (table.height / 2) - 8}
+                  width={table.width}
+                  align="center"
+                  fill="white"
+                  fontSize={12}
+                  fontStyle="bold"
+                  text={`T${table.id}`}
+                />
+              </Group>
+            );
+          })}
+
+         
+
+          {/* Removed guest logic; only single robot follows backend path */}
+        </Layer>
+        <Layer id="robot-layer">
+          {robotPos && (
+            <Group x={robotPos.x} y={robotPos.y}>
+              <Circle radius={ROBOT_RADIUS} fill="#2196F3" stroke="#1565C0" strokeWidth={2} />
+              <Text x={-8} y={-8} width={16} align="center" fill="white" fontSize={12} fontStyle="bold" text="R" />
+            </Group>
+          )}
+        </Layer>
+      </Stage>
     </VegaCard>
   );
 }

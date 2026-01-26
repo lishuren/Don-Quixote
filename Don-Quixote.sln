@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MapNav2Planner", "MapNav2Planner\MapNav2Planner.csproj", "{712FD7CB-F6C0-50DF-A09A-AE19C934A309}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{712FD7CB-F6C0-50DF-A09A-AE19C934A309}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{712FD7CB-F6C0-50DF-A09A-AE19C934A309}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{712FD7CB-F6C0-50DF-A09A-AE19C934A309}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{712FD7CB-F6C0-50DF-A09A-AE19C934A309}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DF5BAE78-A1D1-4F5E-B84C-B43BF57594F7}
+	EndGlobalSection
+EndGlobal

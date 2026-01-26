@@ -1,5 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require('webpack');
 
 module.exports = {
   entry: './src/index.js',
@@ -32,6 +33,15 @@ module.exports = {
       template: './public/index.html',
       title: 'RoboRunner',
     }),
+
+    new webpack.ProvidePlugin({
+      process: 'process/browser',
+    }),
+
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    }),
+
   ],
   resolve: {
     extensions: ['.js', '.jsx'],
@@ -45,7 +55,7 @@ module.exports = {
     proxy: [
       {
         context: ['/api'],
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5199',
         changeOrigin: true,
       },
     ],

@@ -18,22 +18,16 @@ export function generateTableLayout(config, tableCount) {
 
   const { diningArea, mainAisle, minorAisle, seatBuffer, safetyBuffer, tableShape, tableSizes, tableMix } = validConfig;
 
-  // Generate table type distribution
+  // Table type distribution
   const tableTypes = distributeTableTypes(validCount, tableMix);
 
-  // Use smaller cell size for denser placement
-  const avgTableSize = (tableSizes.t2 + tableSizes.t4 + tableSizes.t6 + tableSizes.t8) / 4;
-  // Use smaller cell size - just table + seat buffer for tighter packing
-  const cellSize = avgTableSize + seatBuffer;
-
-  // Calculate main aisle positions (center cross)
+  // Aisles (used to avoid placement inside them)
   const aisleH = {
     x: diningArea.x,
-    y: diningArea.y + diningArea.height / 2 - mainAisle / 2,
+    y: diningArea.y + diningArea.height / 2 - minorAisle / 2,
     width: diningArea.width,
-    height: mainAisle,
+    height: minorAisle,
   };
-
   const aisleV = {
     x: diningArea.x + diningArea.width / 2 - mainAisle / 2,
     y: diningArea.y,
@@ -41,87 +35,116 @@ export function generateTableLayout(config, tableCount) {
     height: diningArea.height,
   };
 
-  // Collect all valid positions first
-  const validPositions = [];
+  // Placement bounds (avoid top/bottom zones)
+  const bounds = getTablePlacementBounds(validConfig.diningArea, validConfig.zones, safetyBuffer);
+  const startX = bounds.startX;
+  const startY = bounds.startY;
+  const endX = bounds.endX;
+  const endY = bounds.endY;
 
-  // Use smaller buffer for collision checking - use minimum table size
-  const minTableSize = Math.min(tableSizes.t2, tableSizes.t4, tableSizes.t6, tableSizes.t8);
-  const collisionRadius = minTableSize / 2;
-
-  // Calculate grid dimensions for entire dining area with proper margins
-  const margin = collisionRadius + safetyBuffer;
-  const startX = diningArea.x + margin;
-  const startY = diningArea.y + margin;
-  const endX = diningArea.x + diningArea.width - margin;
-  const endY = diningArea.y + diningArea.height - margin;
-
-  for (let y = startY; y < endY; y += cellSize) {
-    for (let x = startX; x < endX; x += cellSize) {
-      // Center position is the cell position itself (not offset)
-      const centerX = x;
-      const centerY = y;
-      
-      // Check if this position overlaps with main aisles (use collision radius)
-      const inHorizontalAisle = (centerY + collisionRadius > aisleH.y) && (centerY - collisionRadius < aisleH.y + aisleH.height);
-      const inVerticalAisle = (centerX + collisionRadius > aisleV.x) && (centerX - collisionRadius < aisleV.x + aisleV.width);
-
-      if (inHorizontalAisle || inVerticalAisle) {
-        continue; // Skip positions in the aisles
-      }
-
-      // Check if position is within dining area bounds
-      if (centerX - collisionRadius < diningArea.x || centerX + collisionRadius > diningArea.x + diningArea.width ||
-          centerY - collisionRadius < diningArea.y || centerY + collisionRadius > diningArea.y + diningArea.height) {
-        continue;
-      }
-
-      validPositions.push({ x: centerX, y: centerY });
-    }
-  }
-
-  console.log("Valid positions found:", validPositions.length, "for tableCount:", validCount);
-
-  // Place tables at valid positions
+  // Sequential placement using previous table position
   const tables = [];
-  let typeIndex = 0;
+  let curX = startX;
+  let curY = startY;
+  const rowStartX = startX;
 
-  for (let i = 0; i < Math.min(validCount, validPositions.length); i++) {
-    const pos = validPositions[i];
-    
-    if (typeIndex >= tableTypes.length) {
-      typeIndex = 0;
+  const spacingX = safetyBuffer + seatBuffer; // spacing uses safetyBuffer, not rendering
+  const spacingY = safetyBuffer + seatBuffer;
+
+  console.log("spacingX:", spacingX, "spacingY:", spacingY);
+
+  for (let i = 0; i < tableTypes.length; i++) {
+    const tableType = tableTypes[i] || 't4';
+    const diameter = tableSizes[tableType] || 90; // base size by type
+
+    // Real table width/height (no safetyBuffer in dimensions)
+    let width, height, radius = null;
+    if (tableShape === 'round') {
+      radius = diameter / 2;
+      width = diameter;
+      height = diameter;
+    } else if (tableShape === 'rect') {
+      width = diameter;
+      height = Math.round(diameter * 0.6);
+    } else if (tableShape === 'square') {
+      width = Math.round(diameter * 0.9);
+      height = width;
+    } else {
+      // default to rectangular
+      width = diameter;
+      height = Math.round(diameter * 0.6);
     }
 
-    const tableType = tableTypes[typeIndex] || 't4';
-    const diameter = tableSizes[tableType] || 90;
-    const radius = diameter / 2;
+    // Ensure the table fits horizontally; wrap to next row when needed
+    if (curX + width > endX) {
+      curX = rowStartX;
+      curY += height + spacingY;
+    }
+    // If we exceed vertical bounds, stop placing more tables
+    if (curY + height > endY) break;
 
-    // For rectangular tables: width is diameter, height is diameter * 0.6
-    const rectWidth = diameter;
-    const rectHeight = diameter * 0.6;
+    // Try to find a valid position that doesn't overlap aisles
+    let attempts = 0;
+    while (attempts < 50) {
+      const candidate = { x: curX, y: curY, width, height };
+      const overlapsH = rectsOverlap(candidate, aisleH);
+      const overlapsV = rectsOverlap(candidate, aisleV);
+
+      // Also ensure inside dining area bounds
+      const outOfBounds = candidate.x < startX || candidate.y < startY || candidate.x + width > endX || candidate.y + height > endY;
+
+      if (!overlapsH && !overlapsV && !outOfBounds) break;
+
+      // If overlaps vertical aisle, move just past it
+      if (overlapsV) {
+        curX = aisleV.x + aisleV.width + spacingX;
+      }
+      // If overlaps horizontal aisle, move below it
+      if (overlapsH) {
+        curY = aisleH.y + aisleH.height + spacingY;
+      }
+      // Wrap if we overflow horizontally
+      if (curX + width > endX) {
+        curX = rowStartX;
+        curY += height + spacingY;
+      }
+      // Stop if we exceed vertical bounds
+      if (curY + height > endY) break;
+      attempts++;
+    }
+    if (curY + height > endY) break;
+
+    const x = curX;
+    const y = curY;
+
+    console.log(`Placing table ${i + 1} of type ${tableType} at (${x}, ${y}) with size (${width}x${height})`);
 
     const table = {
-      id: i + 1,
+      id: tables.length + 1,
       type: tableType,
       capacity: parseInt(tableType.substring(1)) || 4,
       shape: tableShape,
-      center: { x: pos.x, y: pos.y },
+      // unified top-left
+      x,
+      y,
+      width,
+      height,
       radius: tableShape === 'round' ? radius : null,
-      side: tableShape === 'square' ? diameter * 0.9 : null,
-      rectWidth: tableShape === 'rect' ? rectWidth : null,
-      rectHeight: tableShape === 'rect' ? rectHeight : null,
+      // bounds used by backend (includes safetyBuffer for obstacle inflation)
       bounds: {
-        x: pos.x - radius - safetyBuffer,
-        y: pos.y - radius - safetyBuffer,
-        width: diameter + safetyBuffer * 2,
-        height: diameter + safetyBuffer * 2,
+        x: x - safetyBuffer,
+        y: y - safetyBuffer,
+        width: width + safetyBuffer,
+        height: height + safetyBuffer,
       },
     };
 
     tables.push(table);
-    typeIndex++;
+    // Next table position based on previous
+    curX = x + width + spacingX;
   }
 
+  console.log("Generated tables:", tables);
   return tables;
 }
 
@@ -140,7 +163,7 @@ function distributeTableTypes(count, mix) {
   const types = [];
   const ratios = {
     t2: mix.t2 / total,
-    t4: mix.t4 / total,
+    t4: mix.t2 / total,
     t6: mix.t6 / total,
     t8: mix.t8 / total,
   };
@@ -168,7 +191,8 @@ function distributeTableTypes(count, mix) {
   }
 
   // Shuffle for variety
-  return shuffleArray(types);
+  // return shuffleArray(types);
+  return types;
 }
 
 /**
@@ -261,4 +285,46 @@ export function getKitchenPosition(config) {
     x: kitchen.x + kitchen.width / 2,
     y: kitchen.y + kitchen.height / 2,
   };
+}
+
+/**
+ * Calculate zones based on diningArea
+ * @param {Object} diningArea - The dining area bounds
+ * @returns {Object} zones - The calculated zones with positions and sizes
+ */
+export function calculateZones(diningArea) {
+  return {
+    kitchen: { x: 50, y: diningArea.height - 30, width: 100, height: 30, label: 'Kitchen', color: '#FF5722' },
+    reception: { x: 150, y: 0, width: 100, height: 30, label: 'Reception', color: '#9C27B0' },
+    cashier: { x: 300, y: 0, width: 100, height: 30, label: 'Cashier', color: '#3F51B5' },
+    restrooms: { x: diningArea.width / 2 + 150, y: diningArea.height - 30, width: 100, height: 30, label: 'Restrooms', color: '#607D8B' },
+  };
+}
+
+/**
+ * Calculate valid startX and startY for tables to avoid overlapping with zones
+ * @param {Object} diningArea - The dining area bounds
+ * @param {Object} zones - The zones object
+ * @param {number} margin - The margin to use for table placement
+ * @returns {Object} { startX, startY, endX, endY }
+ */
+export function getTablePlacementBounds(diningArea, zones, margin) {
+  // Find the max Y of top zones and min Y of bottom zones
+  const topZones = Object.values(zones).filter(z => z.y === 0);
+  const bottomZones = Object.values(zones).filter(z => z.y + z.height === diningArea.height);
+
+  const topZoneMaxY = topZones.length > 0 ? Math.max(...topZones.map(z => z.y + z.height)) : 0;
+  const bottomZoneMinY = bottomZones.length > 0 ? Math.min(...bottomZones.map(z => z.y)) : diningArea.height;
+
+  const startX = diningArea.x + margin;
+  const startY = diningArea.y + margin + topZoneMaxY;
+  const endX = diningArea.x + diningArea.width - margin;
+  const endY = bottomZoneMinY - margin;
+
+  return { startX, startY, endX, endY };
+}
+
+// Rectangle overlap helper
+function rectsOverlap(a, b) {
+  return !(a.x + a.width <= b.x || a.x >= b.x + b.width || a.y + a.height <= b.y || a.y >= b.y + b.height);
 }

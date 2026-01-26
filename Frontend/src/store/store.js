@@ -94,7 +94,7 @@ export const resetConfig = () => ({
 
 // Initial State
 const initialState = {
-  tableCount: 5,
+  tableCount: 20,
   robotCount: 3,
   guestCount: 0,
   speedRate: 1,

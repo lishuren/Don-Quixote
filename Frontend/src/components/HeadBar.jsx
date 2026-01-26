@@ -90,12 +90,14 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
             onVegaChange={handleTableCountChange}
             min={bounds.tableCount.min}
             max={bounds.tableCount.max}
+            disabled={isRunning}
           />
           <VegaInput 
             size="small" 
             label="Robots" 
             type="number"
             value={robotCount.toString()}
+            disabled={isRunning}
             onVegaChange={handleRobotCountChange}
             min={1}
             max={10}
@@ -108,11 +110,13 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
             onVegaChange={handleGuestCountChange}
             min={0}
             max={100}
+            disabled={isRunning}
           />
           <VegaButton 
             variant="secondary"
             icon="fa-solid fa-gear" 
             label="Settings"
+            disabled={isRunning}
             onVegaClick={() => setShowAdvanced(true)}
           />
           {!isRunning ? (
@@ -197,7 +201,9 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
             label="Table Shape"
             value={config.tableShape}
             onVegaChange={(e) => dispatch(setTableShape(e.detail))}
+            disabled={isRunning}
           >
+            <option value="rect">Rectangle</option>
             <option value="round">Round</option>
             <option value="square">Square</option>
           </VegaInputSelect>
@@ -212,6 +218,7 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
               onVegaChange={(e) => dispatch(setTableMix({ ...config.tableMix, t2: parseInt(e.detail) || 0 }))}
               min={0}
               max={20}
+              disabled={isRunning}
             />
             <VegaInput
               label="4-seat"
@@ -220,6 +227,7 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
               onVegaChange={(e) => dispatch(setTableMix({ ...config.tableMix, t4: parseInt(e.detail) || 0 }))}
               min={0}
               max={20}
+              disabled={isRunning}
             />
             <VegaInput
               label="6-seat"
@@ -228,6 +236,7 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
               onVegaChange={(e) => dispatch(setTableMix({ ...config.tableMix, t6: parseInt(e.detail) || 0 }))}
               min={0}
               max={20}
+              disabled={isRunning}
             />
             <VegaInput
               label="8-seat"
@@ -236,6 +245,7 @@ const HeadBar = ({ onStart, onPause, onEnd, isRunning, isPaused }) => {
               onVegaChange={(e) => dispatch(setTableMix({ ...config.tableMix, t8: parseInt(e.detail) || 0 }))}
               min={0}
               max={20}
+              disabled={isRunning}
             />
           </VegaFlex>
 
