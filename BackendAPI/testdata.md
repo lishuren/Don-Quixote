@@ -677,7 +677,7 @@ This document defines test data aligned with the Backend API requirements and th
 
 ## 5. Guests
 
-### 5.1 Guest Queue (50 Guests)
+### 5.1 Guest Queue (100 Guests)
 
 ```json
 {
@@ -731,16 +731,66 @@ This document defines test data aligned with the Backend API requirements and th
     { "id": "guest_147", "partySize": 4, "arrivalTime": "2026-01-26T13:18:00Z", "state": "QUEUED", "queuePosition": 32, "waitMinutes": 0, "preferences": ["booth"] },
     { "id": "guest_148", "partySize": 2, "arrivalTime": "2026-01-26T13:20:00Z", "state": "QUEUED", "queuePosition": 33, "waitMinutes": 0, "preferences": ["quiet"] },
     { "id": "guest_149", "partySize": 5, "arrivalTime": "2026-01-26T13:22:00Z", "state": "QUEUED", "queuePosition": 34, "waitMinutes": 0, "preferences": ["large_party", "window"] },
-    { "id": "guest_150", "partySize": 2, "arrivalTime": "2026-01-26T13:25:00Z", "state": "QUEUED", "queuePosition": 35, "waitMinutes": 0, "preferences": [] }
+    { "id": "guest_150", "partySize": 2, "arrivalTime": "2026-01-26T13:25:00Z", "state": "QUEUED", "queuePosition": 35, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_151", "partySize": 3, "arrivalTime": "2026-01-26T13:28:00Z", "state": "QUEUED", "queuePosition": 36, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_152", "partySize": 4, "arrivalTime": "2026-01-26T13:30:00Z", "state": "QUEUED", "queuePosition": 37, "waitMinutes": 0, "preferences": ["booth"] },
+    { "id": "guest_153", "partySize": 2, "arrivalTime": "2026-01-26T13:32:00Z", "state": "QUEUED", "queuePosition": 38, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_154", "partySize": 6, "arrivalTime": "2026-01-26T13:35:00Z", "state": "QUEUED", "queuePosition": 39, "waitMinutes": 0, "preferences": ["large_party"] },
+    { "id": "guest_155", "partySize": 2, "arrivalTime": "2026-01-26T13:38:00Z", "state": "QUEUED", "queuePosition": 40, "waitMinutes": 0, "preferences": ["window"] },
+    { "id": "guest_156", "partySize": 4, "arrivalTime": "2026-01-26T13:40:00Z", "state": "QUEUED", "queuePosition": 41, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_157", "partySize": 3, "arrivalTime": "2026-01-26T13:42:00Z", "state": "QUEUED", "queuePosition": 42, "waitMinutes": 0, "preferences": ["bar_view"] },
+    { "id": "guest_158", "partySize": 2, "arrivalTime": "2026-01-26T13:45:00Z", "state": "QUEUED", "queuePosition": 43, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_159", "partySize": 5, "arrivalTime": "2026-01-26T13:48:00Z", "state": "QUEUED", "queuePosition": 44, "waitMinutes": 0, "preferences": ["large_party", "vip"] },
+    { "id": "guest_160", "partySize": 2, "arrivalTime": "2026-01-26T13:50:00Z", "state": "QUEUED", "queuePosition": 45, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_161", "partySize": 4, "arrivalTime": "2026-01-26T13:52:00Z", "state": "QUEUED", "queuePosition": 46, "waitMinutes": 0, "preferences": ["booth", "quiet"] },
+    { "id": "guest_162", "partySize": 3, "arrivalTime": "2026-01-26T13:55:00Z", "state": "QUEUED", "queuePosition": 47, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_163", "partySize": 2, "arrivalTime": "2026-01-26T13:58:00Z", "state": "QUEUED", "queuePosition": 48, "waitMinutes": 0, "preferences": ["window"] },
+    { "id": "guest_164", "partySize": 6, "arrivalTime": "2026-01-26T14:00:00Z", "state": "QUEUED", "queuePosition": 49, "waitMinutes": 0, "preferences": ["large_party"] },
+    { "id": "guest_165", "partySize": 2, "arrivalTime": "2026-01-26T14:02:00Z", "state": "QUEUED", "queuePosition": 50, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_166", "partySize": 4, "arrivalTime": "2026-01-26T14:05:00Z", "state": "QUEUED", "queuePosition": 51, "waitMinutes": 0, "preferences": ["booth"] },
+    { "id": "guest_167", "partySize": 3, "arrivalTime": "2026-01-26T14:08:00Z", "state": "QUEUED", "queuePosition": 52, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_168", "partySize": 2, "arrivalTime": "2026-01-26T14:10:00Z", "state": "QUEUED", "queuePosition": 53, "waitMinutes": 0, "preferences": ["bar_view"] },
+    { "id": "guest_169", "partySize": 5, "arrivalTime": "2026-01-26T14:12:00Z", "state": "QUEUED", "queuePosition": 54, "waitMinutes": 0, "preferences": ["large_party", "window"] },
+    { "id": "guest_170", "partySize": 2, "arrivalTime": "2026-01-26T14:15:00Z", "state": "QUEUED", "queuePosition": 55, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_171", "partySize": 4, "arrivalTime": "2026-01-26T14:18:00Z", "state": "QUEUED", "queuePosition": 56, "waitMinutes": 0, "preferences": ["window"] },
+    { "id": "guest_172", "partySize": 3, "arrivalTime": "2026-01-26T14:20:00Z", "state": "QUEUED", "queuePosition": 57, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_173", "partySize": 2, "arrivalTime": "2026-01-26T14:22:00Z", "state": "QUEUED", "queuePosition": 58, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_174", "partySize": 6, "arrivalTime": "2026-01-26T14:25:00Z", "state": "QUEUED", "queuePosition": 59, "waitMinutes": 0, "preferences": ["large_party", "vip"] },
+    { "id": "guest_175", "partySize": 2, "arrivalTime": "2026-01-26T14:28:00Z", "state": "QUEUED", "queuePosition": 60, "waitMinutes": 0, "preferences": ["booth"] },
+    { "id": "guest_176", "partySize": 4, "arrivalTime": "2026-01-26T14:30:00Z", "state": "QUEUED", "queuePosition": 61, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_177", "partySize": 3, "arrivalTime": "2026-01-26T14:32:00Z", "state": "QUEUED", "queuePosition": 62, "waitMinutes": 0, "preferences": ["window"] },
+    { "id": "guest_178", "partySize": 2, "arrivalTime": "2026-01-26T14:35:00Z", "state": "QUEUED", "queuePosition": 63, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_179", "partySize": 5, "arrivalTime": "2026-01-26T14:38:00Z", "state": "QUEUED", "queuePosition": 64, "waitMinutes": 0, "preferences": ["large_party"] },
+    { "id": "guest_180", "partySize": 2, "arrivalTime": "2026-01-26T14:40:00Z", "state": "QUEUED", "queuePosition": 65, "waitMinutes": 0, "preferences": ["bar_view"] },
+    { "id": "guest_181", "partySize": 4, "arrivalTime": "2026-01-26T14:42:00Z", "state": "QUEUED", "queuePosition": 66, "waitMinutes": 0, "preferences": ["booth", "quiet"] },
+    { "id": "guest_182", "partySize": 3, "arrivalTime": "2026-01-26T14:45:00Z", "state": "QUEUED", "queuePosition": 67, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_183", "partySize": 2, "arrivalTime": "2026-01-26T14:48:00Z", "state": "QUEUED", "queuePosition": 68, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_184", "partySize": 6, "arrivalTime": "2026-01-26T14:50:00Z", "state": "QUEUED", "queuePosition": 69, "waitMinutes": 0, "preferences": ["large_party"] },
+    { "id": "guest_185", "partySize": 2, "arrivalTime": "2026-01-26T14:52:00Z", "state": "QUEUED", "queuePosition": 70, "waitMinutes": 0, "preferences": ["window"] },
+    { "id": "guest_186", "partySize": 4, "arrivalTime": "2026-01-26T14:55:00Z", "state": "QUEUED", "queuePosition": 71, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_187", "partySize": 3, "arrivalTime": "2026-01-26T14:58:00Z", "state": "QUEUED", "queuePosition": 72, "waitMinutes": 0, "preferences": ["booth"] },
+    { "id": "guest_188", "partySize": 2, "arrivalTime": "2026-01-26T15:00:00Z", "state": "QUEUED", "queuePosition": 73, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_189", "partySize": 5, "arrivalTime": "2026-01-26T15:02:00Z", "state": "QUEUED", "queuePosition": 74, "waitMinutes": 0, "preferences": ["large_party", "window"] },
+    { "id": "guest_190", "partySize": 2, "arrivalTime": "2026-01-26T15:05:00Z", "state": "QUEUED", "queuePosition": 75, "waitMinutes": 0, "preferences": ["bar_view"] },
+    { "id": "guest_191", "partySize": 4, "arrivalTime": "2026-01-26T15:08:00Z", "state": "QUEUED", "queuePosition": 76, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_192", "partySize": 3, "arrivalTime": "2026-01-26T15:10:00Z", "state": "QUEUED", "queuePosition": 77, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_193", "partySize": 2, "arrivalTime": "2026-01-26T15:12:00Z", "state": "QUEUED", "queuePosition": 78, "waitMinutes": 0, "preferences": ["window"] },
+    { "id": "guest_194", "partySize": 6, "arrivalTime": "2026-01-26T15:15:00Z", "state": "QUEUED", "queuePosition": 79, "waitMinutes": 0, "preferences": ["large_party", "vip"] },
+    { "id": "guest_195", "partySize": 2, "arrivalTime": "2026-01-26T15:18:00Z", "state": "QUEUED", "queuePosition": 80, "waitMinutes": 0, "preferences": ["booth"] },
+    { "id": "guest_196", "partySize": 4, "arrivalTime": "2026-01-26T15:20:00Z", "state": "QUEUED", "queuePosition": 81, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_197", "partySize": 3, "arrivalTime": "2026-01-26T15:22:00Z", "state": "QUEUED", "queuePosition": 82, "waitMinutes": 0, "preferences": ["quiet"] },
+    { "id": "guest_198", "partySize": 2, "arrivalTime": "2026-01-26T15:25:00Z", "state": "QUEUED", "queuePosition": 83, "waitMinutes": 0, "preferences": [] },
+    { "id": "guest_199", "partySize": 5, "arrivalTime": "2026-01-26T15:28:00Z", "state": "QUEUED", "queuePosition": 84, "waitMinutes": 0, "preferences": ["large_party"] },
+    { "id": "guest_200", "partySize": 2, "arrivalTime": "2026-01-26T15:30:00Z", "state": "QUEUED", "queuePosition": 85, "waitMinutes": 0, "preferences": ["window", "vip"] }
   ]
 }
 ```
 
-### 5.2 Guest State Summary (50 Guests)
+### 5.2 Guest State Summary (100 Guests)
 
 | State | Count | Guest IDs (Sample) |
 |-------|-------|-------------------|
-| `QUEUED` | 35 | guest_101, guest_102, guest_109, ... guest_150 |
+| `QUEUED` | 85 | guest_101, guest_102, guest_109, ... guest_200 |
 | `ESCORTING` | 2 | guest_103, guest_117 |
 | `ORDERING` | 3 | guest_105, guest_113, guest_123 |
 | `EATING` | 7 | guest_104, guest_110, guest_111, guest_114, guest_116, guest_120, guest_126 |
@@ -761,6 +811,8 @@ This document defines test data aligned with the Backend API requirements and th
 | `guest_108` | 4 | `LINGERING` | T12 | Overstaying (20 min) |
 | `guest_117` | 2 | `ESCORTING` | T16 | Being escorted (walk-in) |
 | `guest_137` | 5 | `QUEUED` | -- | VIP preference in queue |
+| `guest_174` | 6 | `QUEUED` | -- | Large party VIP |
+| `guest_200` | 2 | `QUEUED` | -- | Last in queue (VIP) |
 
 ---
 
