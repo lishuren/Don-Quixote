@@ -176,6 +176,60 @@ The `IDispatchEngine` handles automatic task assignment with algorithms:
 
 **Background Auto-Dispatch**: `DispatchBackgroundService` runs every 10s (configurable) to automatically assign pending tasks.
 
+### Auto-Assignment Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DispatchBackgroundService                     │
+│                   (runs continuously in background)              │
+├─────────────────────────────────────────────────────────────────┤
+│  Loop: RefreshConfig → CheckEnabled → DispatchTasks → Wait      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                        DispatchEngine                            │
+│  1. Get pending tasks (Priority DESC, CreatedAt ASC)            │
+│  2. For each task → FindBestRobotForTask(algorithm)             │
+│  3. Assign & broadcast via SignalR                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Assignment Algorithms
+
+| Algorithm | Selection Logic | Best For |
+|-----------|-----------------|----------|
+| `nearest` | Closest robot to target (Euclidean distance) | Minimizing travel time |
+| `round_robin` | Robot with fewest recent tasks | Even workload distribution |
+| `load_balanced` | Fewest tasks + highest battery | Balanced utilization |
+| `priority` | High battery for urgent tasks, nearest for others | Critical deliveries |
+
+### Robot Eligibility Criteria
+
+A robot is eligible only if **ALL** conditions are met:
+```csharp
+r.IsEnabled == true              // Not disabled
+r.Status == RobotStatus.Idle     // Not busy
+r.BatteryLevel >= MinBattery     // Sufficient battery (default 20%)
+CurrentTaskCount < MaxTasks      // Not at max capacity (default 3)
+```
+
+### Task Queue Ordering
+
+1. **Priority** (descending): `Urgent > High > Normal > Low`
+2. **CreatedAt** (ascending): Older tasks first within same priority
+
+### Supported Cases
+
+| Case | Handling |
+|------|----------|
+| Food ready for delivery | High/Urgent priority → processed first |
+| Guest needs help | High priority Service task → quick assignment |
+| Multiple pending tasks | All processed in priority order each cycle |
+| No available robots | Task stays Pending, retried next cycle |
+| Robot at max capacity | Excluded, other robots chosen |
+| Low battery robots | Excluded until charged |
+| Config changes | RefreshConfig() reads new settings each cycle |
+
 ## Event-Driven Task Queue
 
 The `IEventTriggerService` converts restaurant events into robot tasks automatically:
