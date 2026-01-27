@@ -155,6 +155,7 @@ The hub is at `/hubs/restaurant`. Events broadcast:
 - `AlertCreated` - New alerts
 - `TableStatusChanged` - Table occupancy changes
 - `GuestEvent` - Guest arrived/seated/left
+- `SimulationProgressUpdated` - Long-run simulation progress (every 5s)
 
 Inject `IEventBroadcaster` to broadcast events:
 
@@ -163,6 +164,9 @@ if (broadcaster is not null)
 {
     await broadcaster.BroadcastRobotStatusChanged(
         robot.Id, robot.Name, oldStatus, newStatus, reason);
+    
+    // For simulation progress
+    await broadcaster.BroadcastSimulationProgress(progressEvent);
 }
 ```
 
@@ -361,3 +365,81 @@ Key dispatch and task settings stored in `SystemConfig`:
 | `dispatch.minBattery` | Min battery for assignment | `20` |
 | `task.retryLimit` | Max task retries | `3` |
 | `task.priorityEscalationMinutes` | Escalate after N mins | `3` |
+
+## Long-Run Simulation Engine
+
+The system includes a **time-accelerated simulation engine** for capacity planning and stress testing. It can simulate weeks or months of restaurant operations in minutes/hours.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      SimulationEngine                            │
+│                   (BackgroundService)                            │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐    ┌──────────────────┐    ┌────────────────┐  │
+│  │ Simulation  │    │ RestaurantEvent  │    │   Simulation   │  │
+│  │    Clock    │    │    Generator     │    │    Metrics     │  │
+│  │  (virtual)  │    │  (event queue)   │    │  (aggregator)  │  │
+│  └─────────────┘    └──────────────────┘    └────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `ISimulationClock` | Services/Simulation/ | Virtual time with acceleration |
+| `IRestaurantEventGenerator` | Services/Simulation/ | Generates realistic guest patterns |
+| `ISimulationMetricsAggregator` | Services/Simulation/ | Collects hourly/daily metrics |
+| `ISimulationEngine` | Services/Simulation/ | Main engine, orchestrates simulation |
+
+### Acceleration Presets
+
+| Preset | Factor | Real Time for 1 Month |
+|--------|--------|----------------------|
+| RealTime | 1x | ~30 days |
+| Fast | 10x | ~3 days |
+| VeryFast | 60x | ~12 hours |
+| Monthly | 720x | ~1 hour |
+| Yearly | 8640x | ~1 hour (for 1 year) |
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/simulation/long-run` | POST | Start simulation |
+| `/api/simulation/long-run/progress` | GET | Get progress |
+| `/api/simulation/long-run/pause` | POST | Pause simulation |
+| `/api/simulation/long-run/resume` | POST | Resume simulation |
+| `/api/simulation/long-run/stop` | POST | Stop simulation |
+| `/api/simulation/long-run/report` | GET | Get final report |
+
+### Starting a Simulation
+
+```csharp
+POST /api/simulation/long-run
+{
+  "simulatedStartTime": "2026-02-01T07:00:00",
+  "simulatedEndTime": "2026-03-01T23:00:00",
+  "accelerationFactor": 720,
+  "robotCount": 5,
+  "tableCount": 20
+}
+```
+
+### Event Generation Patterns
+
+The generator creates realistic traffic based on:
+- **Hourly rates**: Breakfast (7-9), Lunch (11-14), Dinner (17-21) peaks
+- **Day multipliers**: Weekend 1.5x, Monday 0.7x
+- **Event chain**: GuestArrived → GuestSeated → FoodReady → GuestLeft → TableNeedsCleaning
+
+### Simulation Reports
+
+After completion, reports include:
+- Total guests, tasks, deliveries, failures
+- Success rate and average task duration
+- Peak times and volumes
+- Per-robot performance metrics
+- Daily breakdown with hourly detail

@@ -98,7 +98,24 @@ npm start
 | Guests | `/api/guests` | Guest/waitlist |
 | Dispatch | `/api/dispatch` | Auto task assignment |
 | Simulation | `/api/simulation` | Test scenarios |
+| Long-Run Sim | `/api/simulation/long-run` | Time-accelerated simulation |
 | WebSocket | `/hubs/restaurant` | Real-time events |
+
+## Long-Run Simulation
+
+The backend includes a **time-accelerated simulation engine** for capacity planning:
+
+| Preset | Factor | Real Time for 1 Month |
+|--------|--------|----------------------|
+| Monthly | 720x | ~1 hour |
+| Yearly | 8640x | ~1 hour (for 1 year) |
+
+### Key Endpoints
+- `POST /api/simulation/long-run` - Start simulation
+- `GET /api/simulation/long-run/progress` - Monitor progress
+- `GET /api/simulation/long-run/report` - Get final report
+
+See `BackendAPI/MapPlannerApi/docs/SUPPORTED_SCENARIOS.md` for full documentation.
 
 ## Cross-Project Considerations
 

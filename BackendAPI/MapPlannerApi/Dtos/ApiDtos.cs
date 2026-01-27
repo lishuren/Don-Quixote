@@ -613,3 +613,145 @@ public record GuestEvent(
     string? TableLabel,
     DateTime Timestamp
 );
+// ========== Simulation DTOs ==========
+
+/// <summary>
+/// Request to start a long-running simulation.
+/// </summary>
+public record StartSimulationRequest(
+    DateTime? SimulatedStartTime = null,
+    DateTime? SimulatedEndTime = null,
+    double AccelerationFactor = 720,
+    int RobotCount = 5,
+    int TableCount = 20,
+    int? RandomSeed = null,
+    SimulationEventPatternDto? EventPatterns = null
+);
+
+/// <summary>
+/// Event pattern configuration for simulation.
+/// </summary>
+public record SimulationEventPatternDto(
+    double[]? HourlyArrivalRates = null,
+    double[]? DayOfWeekMultipliers = null,
+    int AverageMealDurationMinutes = 45,
+    double GuestNeedsHelpProbability = 0.15,
+    double AveragePartySize = 2.5
+);
+
+/// <summary>
+/// Response when starting a simulation.
+/// </summary>
+public record StartSimulationResponse(
+    string SimulationId,
+    string Status,
+    DateTime SimulatedStartTime,
+    DateTime SimulatedEndTime,
+    double AccelerationFactor,
+    int EstimatedEventsCount,
+    TimeSpan EstimatedRealDuration
+);
+
+/// <summary>
+/// Progress of an active simulation.
+/// </summary>
+public record SimulationProgressDto(
+    string SimulationId,
+    string State,
+    DateTime SimulatedStartTime,
+    DateTime SimulatedEndTime,
+    DateTime CurrentSimulatedTime,
+    double ProgressPercent,
+    string RealElapsedTime,
+    string EstimatedTimeRemaining,
+    double AccelerationFactor,
+    int EventsProcessed,
+    int TotalEventsScheduled,
+    int GuestsProcessed,
+    int TasksCreated,
+    int TasksCompleted,
+    double CurrentSuccessRate
+);
+
+/// <summary>
+/// Summary metrics from a completed simulation.
+/// </summary>
+public record SimulationReportSummaryDto(
+    string SimulationId,
+    string State,
+    DateTime SimulatedStartTime,
+    DateTime SimulatedEndTime,
+    string SimulatedDuration,
+    string RealDuration,
+    double AccelerationFactor,
+    int TotalGuests,
+    int TotalTasks,
+    int TotalDeliveries,
+    int TotalFailures,
+    double OverallSuccessRate,
+    double AverageTaskDurationSeconds,
+    double AverageRobotUtilization,
+    int PeakGuestCount,
+    DateTime PeakGuestTime,
+    int TotalAlerts,
+    Dictionary<string, int> AlertsByType
+);
+
+/// <summary>
+/// Daily breakdown from simulation report.
+/// </summary>
+public record SimulationDailyMetricsDto(
+    DateTime Date,
+    string DayOfWeek,
+    int TotalGuests,
+    int TotalTasks,
+    int TotalDeliveries,
+    int TotalFailures,
+    double SuccessRate,
+    int PeakHour,
+    double PeakHourGuests,
+    double AverageRobotUtilization
+);
+
+/// <summary>
+/// Robot performance from simulation.
+/// </summary>
+public record SimulationRobotMetricsDto(
+    int RobotId,
+    string RobotName,
+    int TasksCompleted,
+    int TasksFailed,
+    double SuccessRate,
+    double AverageTaskDuration,
+    double UtilizationPercent,
+    double AverageBattery
+);
+
+/// <summary>
+/// Full simulation report response.
+/// </summary>
+public record SimulationReportDto(
+    SimulationReportSummaryDto Summary,
+    List<SimulationDailyMetricsDto> DailyBreakdown,
+    List<SimulationRobotMetricsDto> RobotMetrics
+);
+
+/// <summary>
+/// SignalR event for simulation progress updates.
+/// </summary>
+public record SimulationProgressEvent(
+    string SimulationId,
+    string State,
+    DateTime CurrentSimulatedTime,
+    double ProgressPercent,
+    string RealElapsedTime,
+    string EstimatedTimeRemaining,
+    int EventsProcessed,
+    int TotalEventsScheduled,
+    int GuestsProcessed,
+    int TasksCreated,
+    int TasksCompleted,
+    int TasksFailed,
+    double CurrentSuccessRate,
+    DateTime Timestamp
+);

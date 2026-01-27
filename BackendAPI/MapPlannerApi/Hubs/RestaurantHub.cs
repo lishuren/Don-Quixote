@@ -114,6 +114,23 @@ public class RestaurantHub : Hub
     }
 
     /// <summary>
+    /// Subscribe to simulation progress updates
+    /// </summary>
+    public async Task SubscribeToSimulation()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, "Simulation");
+        _logger.LogDebug("Client {ConnectionId} subscribed to Simulation updates", Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Unsubscribe from simulation updates
+    /// </summary>
+    public async Task UnsubscribeFromSimulation()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, "Simulation");
+    }
+
+    /// <summary>
     /// Ping to check connection
     /// </summary>
     public async Task<string> Ping()

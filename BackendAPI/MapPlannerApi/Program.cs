@@ -1,4 +1,5 @@
 using MapPlannerApi.Services;
+using MapPlannerApi.Services.Simulation;
 using MapPlannerApi.Models;
 using MapPlannerApi.Data;
 using MapPlannerApi.Endpoints;
@@ -67,6 +68,14 @@ builder.Services.AddScoped<ConfigRepository>();
 builder.Services.AddScoped<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddScoped<IDispatchEngine, DispatchEngine>();
 builder.Services.AddScoped<IEventTriggerService, EventTriggerService>();
+
+// Simulation services (singletons for long-running simulations)
+builder.Services.AddSingleton<ISimulationClock, SimulationClock>();
+builder.Services.AddSingleton<IRestaurantEventGenerator, RestaurantEventGenerator>();
+builder.Services.AddSingleton<ISimulationMetricsAggregator, SimulationMetricsAggregator>();
+builder.Services.AddSingleton<SimulationEngine>();
+builder.Services.AddSingleton<ISimulationEngine>(sp => sp.GetRequiredService<SimulationEngine>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulationEngine>());
 
 // Background services for monitoring
 builder.Services.AddHostedService<RobotMonitorService>();

@@ -2,6 +2,7 @@ using MapPlannerApi.Data;
 using MapPlannerApi.Dtos;
 using MapPlannerApi.Entities;
 using MapPlannerApi.Services;
+using MapPlannerApi.Services.Simulation;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 
@@ -328,6 +329,242 @@ public static class SimulationEndpoints
         })
         .WithName("LoadSimulationScenario")
         .WithDescription("Load a predefined simulation scenario");
+
+        // ========== Long-Run Simulation Endpoints ==========
+        // These endpoints support time-accelerated simulations (e.g., 1 hour real time = 1 month simulated)
+
+        // POST /api/simulation/long-run - Start a long-running accelerated simulation
+        group.MapPost("/long-run", async (StartSimulationRequest request, ISimulationEngine engine) =>
+        {
+            if (engine.State == SimulationState.Running)
+            {
+                return Results.Conflict(new { error = "A simulation is already running. Stop it first." });
+            }
+
+            var startTime = request.SimulatedStartTime ?? DateTime.Today.AddHours(7); // Default: 7 AM today
+            var endTime = request.SimulatedEndTime ?? startTime.AddDays(30); // Default: 30 days
+
+            // Validate time range
+            if (endTime <= startTime)
+            {
+                return Results.BadRequest(new { error = "SimulatedEndTime must be after SimulatedStartTime" });
+            }
+
+            // Build event pattern config
+            EventPatternConfig? eventPatterns = null;
+            if (request.EventPatterns != null)
+            {
+                eventPatterns = new EventPatternConfig
+                {
+                    HourlyArrivalRates = request.EventPatterns.HourlyArrivalRates ?? new EventPatternConfig().HourlyArrivalRates,
+                    DayOfWeekMultipliers = request.EventPatterns.DayOfWeekMultipliers ?? new EventPatternConfig().DayOfWeekMultipliers,
+                    AverageMealDurationMinutes = request.EventPatterns.AverageMealDurationMinutes,
+                    GuestNeedsHelpProbability = request.EventPatterns.GuestNeedsHelpProbability,
+                    AveragePartySize = request.EventPatterns.AveragePartySize
+                };
+            }
+
+            var config = new SimulationConfig
+            {
+                SimulatedStartTime = startTime,
+                SimulatedEndTime = endTime,
+                AccelerationFactor = request.AccelerationFactor,
+                RobotCount = request.RobotCount,
+                TableCount = request.TableCount,
+                RandomSeed = request.RandomSeed,
+                EventPatterns = eventPatterns
+            };
+
+            var simulationId = await engine.StartSimulation(config);
+
+            // Estimate real duration
+            var simulatedDuration = endTime - startTime;
+            var estimatedRealDuration = TimeSpan.FromTicks((long)(simulatedDuration.Ticks / config.AccelerationFactor));
+
+            // Get initial progress to get event count
+            var progress = engine.GetProgress();
+
+            return Results.Ok(new StartSimulationResponse(
+                SimulationId: simulationId,
+                Status: "Running",
+                SimulatedStartTime: startTime,
+                SimulatedEndTime: endTime,
+                AccelerationFactor: config.AccelerationFactor,
+                EstimatedEventsCount: progress.TotalEventsScheduled,
+                EstimatedRealDuration: estimatedRealDuration
+            ));
+        })
+        .WithName("StartLongRunSimulation")
+        .WithDescription("Start a long-running time-accelerated simulation (e.g., 720x = 1 month in ~1 hour)");
+
+        // GET /api/simulation/long-run/progress - Get progress of active long-run simulation
+        group.MapGet("/long-run/progress", (ISimulationEngine engine) =>
+        {
+            if (engine.State == SimulationState.NotStarted)
+            {
+                return Results.NotFound(new { error = "No simulation is running" });
+            }
+
+            var progress = engine.GetProgress();
+
+            return Results.Ok(new SimulationProgressDto(
+                SimulationId: progress.SimulationId,
+                State: progress.State.ToString(),
+                SimulatedStartTime: progress.SimulatedStartTime,
+                SimulatedEndTime: progress.SimulatedEndTime,
+                CurrentSimulatedTime: progress.CurrentSimulatedTime,
+                ProgressPercent: Math.Round(progress.ProgressPercent, 2),
+                RealElapsedTime: FormatDuration(progress.RealElapsedTime),
+                EstimatedTimeRemaining: FormatDuration(progress.EstimatedTimeRemaining),
+                AccelerationFactor: progress.AccelerationFactor,
+                EventsProcessed: progress.EventsProcessed,
+                TotalEventsScheduled: progress.TotalEventsScheduled,
+                GuestsProcessed: progress.GuestsProcessed,
+                TasksCreated: progress.TasksCreated,
+                TasksCompleted: progress.TasksCompleted,
+                CurrentSuccessRate: Math.Round(progress.CurrentSuccessRate, 2)
+            ));
+        })
+        .WithName("GetLongRunProgress")
+        .WithDescription("Get progress of the active long-run simulation");
+
+        // POST /api/simulation/long-run/pause - Pause the long-run simulation
+        group.MapPost("/long-run/pause", async (ISimulationEngine engine) =>
+        {
+            if (engine.State != SimulationState.Running)
+            {
+                return Results.BadRequest(new { error = "No running simulation to pause" });
+            }
+
+            await engine.PauseSimulation();
+            return Results.Ok(new { message = "Simulation paused", state = "Paused" });
+        })
+        .WithName("PauseLongRunSimulation")
+        .WithDescription("Pause the active long-run simulation");
+
+        // POST /api/simulation/long-run/resume - Resume a paused simulation
+        group.MapPost("/long-run/resume", async (ISimulationEngine engine) =>
+        {
+            if (engine.State != SimulationState.Paused)
+            {
+                return Results.BadRequest(new { error = "No paused simulation to resume" });
+            }
+
+            await engine.ResumeSimulation();
+            return Results.Ok(new { message = "Simulation resumed", state = "Running" });
+        })
+        .WithName("ResumeLongRunSimulation")
+        .WithDescription("Resume a paused long-run simulation");
+
+        // POST /api/simulation/long-run/stop - Stop the long-run simulation
+        group.MapPost("/long-run/stop", async (ISimulationEngine engine) =>
+        {
+            if (engine.State == SimulationState.NotStarted)
+            {
+                return Results.BadRequest(new { error = "No simulation is running" });
+            }
+
+            await engine.StopSimulation();
+            return Results.Ok(new { message = "Simulation stopped", state = "Cancelled" });
+        })
+        .WithName("StopLongRunSimulation")
+        .WithDescription("Stop the active long-run simulation");
+
+        // GET /api/simulation/long-run/report - Get the report from a completed simulation
+        group.MapGet("/long-run/report", (ISimulationEngine engine) =>
+        {
+            var report = engine.GetReport();
+            if (report == null)
+            {
+                if (engine.State == SimulationState.Running)
+                {
+                    return Results.BadRequest(new { error = "Simulation is still running. Wait for completion." });
+                }
+                return Results.NotFound(new { error = "No simulation report available" });
+            }
+
+            var summary = new SimulationReportSummaryDto(
+                SimulationId: report.SimulationId,
+                State: "Completed",
+                SimulatedStartTime: report.SimulatedStartTime,
+                SimulatedEndTime: report.SimulatedEndTime,
+                SimulatedDuration: FormatDuration(report.SimulatedDuration),
+                RealDuration: FormatDuration(report.RealDuration),
+                AccelerationFactor: report.AccelerationFactor,
+                TotalGuests: report.TotalGuests,
+                TotalTasks: report.TotalTasks,
+                TotalDeliveries: report.TotalDeliveries,
+                TotalFailures: report.TotalFailures,
+                OverallSuccessRate: Math.Round(report.OverallSuccessRate, 2),
+                AverageTaskDurationSeconds: Math.Round(report.AverageTaskDurationSeconds, 2),
+                AverageRobotUtilization: Math.Round(report.AverageRobotUtilization, 2),
+                PeakGuestCount: report.PeakGuestCount,
+                PeakGuestTime: report.PeakGuestTime,
+                TotalAlerts: report.TotalAlerts,
+                AlertsByType: report.AlertsByType
+            );
+
+            var dailyBreakdown = report.DailyBreakdown.Select(d => new SimulationDailyMetricsDto(
+                Date: d.Date,
+                DayOfWeek: d.DayOfWeek.ToString(),
+                TotalGuests: d.TotalGuests,
+                TotalTasks: d.TotalTasks,
+                TotalDeliveries: d.TotalDeliveries,
+                TotalFailures: d.TotalFailures,
+                SuccessRate: Math.Round(d.SuccessRate, 2),
+                PeakHour: d.PeakHour,
+                PeakHourGuests: d.PeakHourGuests,
+                AverageRobotUtilization: Math.Round(d.AverageRobotUtilization, 2)
+            )).ToList();
+
+            var robotMetrics = report.RobotMetrics.Values.Select(r => new SimulationRobotMetricsDto(
+                RobotId: r.RobotId,
+                RobotName: r.RobotName,
+                TasksCompleted: r.TasksCompleted,
+                TasksFailed: r.TasksFailed,
+                SuccessRate: Math.Round(r.SuccessRate, 2),
+                AverageTaskDuration: Math.Round(r.AverageTaskDuration, 2),
+                UtilizationPercent: Math.Round(r.UtilizationPercent, 2),
+                AverageBattery: Math.Round(r.AverageBattery, 2)
+            )).ToList();
+
+            return Results.Ok(new SimulationReportDto(
+                Summary: summary,
+                DailyBreakdown: dailyBreakdown,
+                RobotMetrics: robotMetrics
+            ));
+        })
+        .WithName("GetLongRunReport")
+        .WithDescription("Get the detailed report from a completed long-run simulation");
+
+        // GET /api/simulation/long-run/acceleration-presets - Get acceleration presets
+        group.MapGet("/long-run/acceleration-presets", () =>
+        {
+            var presets = new[]
+            {
+                new { name = "RealTime", factor = 1.0, description = "1x speed - Real time" },
+                new { name = "Fast", factor = 10.0, description = "10x speed - 1 hour = 6 minutes" },
+                new { name = "VeryFast", factor = 60.0, description = "60x speed - 1 hour = 1 minute" },
+                new { name = "Daily", factor = 144.0, description = "144x speed - 1 day = 10 minutes" },
+                new { name = "Weekly", factor = 1008.0, description = "1008x speed - 1 week = 10 minutes" },
+                new { name = "Monthly", factor = 720.0, description = "720x speed - 1 month ≈ 1 hour" },
+                new { name = "Yearly", factor = 8640.0, description = "8640x speed - 1 year ≈ 1 hour" }
+            };
+            return Results.Ok(presets);
+        })
+        .WithName("GetAccelerationPresets")
+        .WithDescription("Get predefined acceleration factor presets for long-run simulations");
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalDays >= 1)
+            return $"{(int)duration.TotalDays}d {duration.Hours}h {duration.Minutes}m";
+        if (duration.TotalHours >= 1)
+            return $"{(int)duration.TotalHours}h {duration.Minutes}m {duration.Seconds}s";
+        if (duration.TotalMinutes >= 1)
+            return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
+        return $"{duration.Seconds}s";
     }
 
     // Internal class to track simulation sessions

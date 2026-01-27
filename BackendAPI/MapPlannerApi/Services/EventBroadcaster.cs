@@ -15,6 +15,7 @@ public interface IEventBroadcaster
     Task BroadcastAlertCreated(int alertId, string type, string severity, string title, string? message = null, int? robotId = null);
     Task BroadcastTableStatusChanged(int tableId, string? label, string oldStatus, string newStatus, int? guestId = null);
     Task BroadcastGuestEvent(int guestId, string? guestName, string eventType, int? tableId = null, string? tableLabel = null);
+    Task BroadcastSimulationProgress(SimulationProgressEvent progress);
 }
 
 /// <summary>
@@ -125,5 +126,18 @@ public class EventBroadcaster : IEventBroadcaster
         await Task.WhenAll(tasks);
 
         _logger.LogInformation("Guest event: {EventType} for guest {GuestId}", eventType, guestId);
+    }
+
+    public async Task BroadcastSimulationProgress(SimulationProgressEvent progress)
+    {
+        await Task.WhenAll(
+            _hubContext.Clients.Group("All").SendAsync("SimulationProgressUpdated", progress),
+            _hubContext.Clients.Group("Simulation").SendAsync("SimulationProgressUpdated", progress)
+        );
+
+        _logger.LogDebug(
+            "Simulation progress broadcast: {SimulationId} - {Percent:F1}%",
+            progress.SimulationId,
+            progress.ProgressPercent);
     }
 }
