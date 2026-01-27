@@ -304,6 +304,7 @@ public static class RobotEndpoints
             robot.Heading = request.Heading;
             robot.Velocity = request.Velocity;
             robot.LastUpdated = DateTime.UtcNow;
+            robot.LastHeartbeat = DateTime.UtcNow;
 
             // Check for error conditions
             if (!string.IsNullOrEmpty(request.ErrorMessage))

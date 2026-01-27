@@ -32,7 +32,9 @@ MapPlannerApi/
 │   ├── ZoneEndpoints.cs           # Zone/checkpoint management
 │   ├── DispatchEndpoints.cs       # Auto task dispatch
 │   ├── SimulationEndpoints.cs     # Simulation controls
-│   └── IntegrationEndpoints.cs    # Webhooks, POS, Emergency
+│   ├── IntegrationEndpoints.cs    # Webhooks, POS, Emergency
+│   ├── KitchenEndpoints.cs        # Kitchen/food ready events
+│   └── EventEndpoints.cs          # Event triggers (guest, table, robot)
 ├── Entities/                       # EF Core entity models
 ├── Dtos/
 │   └── ApiDtos.cs                 # All request/response DTOs
@@ -40,7 +42,10 @@ MapPlannerApi/
 │   └── RestaurantHub.cs           # SignalR hub
 ├── Services/
 │   ├── EventBroadcaster.cs        # SignalR event broadcasting
+│   ├── EventTriggerService.cs     # Event → Task automation
 │   ├── DispatchEngine.cs          # Task assignment algorithms
+│   ├── DispatchBackgroundService.cs # Auto-dispatch scheduler
+│   ├── RobotMonitorService.cs     # Robot health & failover
 │   ├── MapStore.cs                # Legacy map storage
 │   └── PathPlanner.cs             # Legacy path planning
 ├── Models/                         # Legacy models
@@ -114,7 +119,7 @@ public class Example
 | Entity | Purpose |
 |--------|---------|
 | `Robot` | Delivery robot with position, battery, status |
-| `RobotTask` | Task assigned to robot (Deliver, Return, Charge, Patrol) |
+| `RobotTask` | Task assigned to robot (Deliver, Return, Charge, Patrol, Escort, Service, Cleaning) |
 | `TableEntity` | Restaurant table with capacity and status |
 | `Guest` | Guest/party with waitlist position |
 | `Alert` | System alerts and notifications |
@@ -168,6 +173,54 @@ The `IDispatchEngine` handles automatic task assignment with algorithms:
 - `round_robin` - Distribute tasks evenly
 - `load_balanced` - Balance by task count and battery
 - `priority` - Prioritize by task urgency
+
+**Background Auto-Dispatch**: `DispatchBackgroundService` runs every 10s (configurable) to automatically assign pending tasks.
+
+## Event-Driven Task Queue
+
+The `IEventTriggerService` converts restaurant events into robot tasks automatically:
+
+### Event Types
+```csharp
+// Guest events
+GuestArrived, GuestSeated, GuestNeedsHelp, GuestRequestedCheck, GuestLeft
+
+// Kitchen events  
+FoodReady, DrinkReady, OrderReady
+
+// Table events
+TableNeedsService, TableNeedsCleaning, TableNeedsBussing, TableNeedsSetup
+
+// Robot events
+RobotLowBattery, RobotBlocked, RobotError
+```
+
+### Triggering Events
+```csharp
+// Via injection
+await eventTrigger.TriggerEvent(new TriggerEventRequest(
+    TriggerEventType.FoodReady,
+    TableId: 5,
+    OrderId: "ORD-123"
+));
+
+// Via API
+POST /api/events/trigger
+POST /api/kitchen/order-ready
+POST /api/events/guest-help
+```
+
+### Task Priority Escalation
+Stale tasks (>3min unassigned) are automatically escalated:
+- Low → Normal → High → Urgent
+
+## Robot Monitoring & Failover
+
+`RobotMonitorService` background service handles:
+- **Heartbeat timeout** (30s): Marks robot as Error, reassigns tasks
+- **Blocked detection** (2min): Tasks taking too long trigger failover
+- **Low battery** (≤15%): Creates charging task
+- **Retry limits**: Tasks fail permanently after `MaxRetryCount` retries
 
 ## Dual Coordinate System
 
@@ -240,3 +293,17 @@ Swagger UI available at: `http://localhost:5199/swagger`
 - Don't forget to register new services in `Program.cs`
 - Don't use `AlertType.Emergency` or `AlertType.System` (use `AlertType.Custom`)
 - Don't use `TaskType.Delivery` (use `TaskType.Deliver`)
+
+## Configuration Keys
+
+Key dispatch and task settings stored in `SystemConfig`:
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `dispatch.algorithm` | Assignment algorithm | `nearest` |
+| `dispatch.autoEnabled` | Enable auto-dispatch | `true` |
+| `dispatch.intervalSeconds` | Auto-dispatch interval | `10` |
+| `dispatch.maxTasksPerRobot` | Max concurrent tasks | `3` |
+| `dispatch.minBattery` | Min battery for assignment | `20` |
+| `task.retryLimit` | Max task retries | `3` |
+| `task.priorityEscalationMinutes` | Escalate after N mins | `3` |

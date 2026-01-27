@@ -16,6 +16,7 @@ public enum AlertType
     LowBattery,
     NavigationBlocked,
     TaskFailed,
+    TaskOverdue,
     SystemWarning,
     TableService,
     GuestWaiting,

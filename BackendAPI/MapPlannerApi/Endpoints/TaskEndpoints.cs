@@ -157,6 +157,44 @@ public static class TaskEndpoints
         .WithName("FailTask")
         .WithDescription("Mark task as failed");
 
+        // POST /api/tasks/{id}/unassign - Unassign task from robot and return to queue
+        group.MapPost("/{id:int}/unassign", async (int id, TaskRepository repo, RobotRepository robotRepo, RestaurantDbContext db) =>
+        {
+            var task = await repo.GetByIdAsync(id);
+            if (task is null)
+                return Results.NotFound(new { error = $"Task {id} not found" });
+
+            if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Cancelled)
+                return Results.BadRequest(new { error = $"Cannot unassign task with status {task.Status}" });
+
+            var previousRobotId = task.RobotId;
+            
+            // Reset task to pending
+            task.RobotId = null;
+            task.Status = TaskStatus.Pending;
+            task.AssignedAt = null;
+            
+            // Clear robot's current task reference if it was assigned
+            if (previousRobotId.HasValue)
+            {
+                var robot = await robotRepo.GetByIdAsync(previousRobotId.Value);
+                if (robot != null && robot.CurrentTaskId == id)
+                {
+                    robot.CurrentTaskId = null;
+                    robot.Status = RobotStatus.Idle;
+                }
+            }
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { 
+                message = $"Task {id} unassigned and returned to queue",
+                previousRobotId
+            });
+        })
+        .WithName("UnassignTask")
+        .WithDescription("Unassign task from robot and return to pending queue");
+
         // GET /api/tasks/queue/summary - Get queue summary
         group.MapGet("/queue/summary", async (TaskRepository repo, RestaurantDbContext db) =>
         {

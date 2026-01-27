@@ -37,4 +37,14 @@ public static class ConfigKeys
     public const string AlertRetentionDays = "alert.retentionDays";
     public const string ReservationLeadTimeMinutes = "reservation.leadTimeMinutes";
     public const string WaitlistEnabled = "guest.waitlistEnabled";
+    
+    // Dispatch configuration
+    public const string DispatchAlgorithm = "dispatch.algorithm";
+    public const string DispatchMaxTasksPerRobot = "dispatch.maxTasksPerRobot";
+    public const string DispatchMinBattery = "dispatch.minBattery";
+    public const string DispatchAutoEnabled = "dispatch.autoEnabled";
+    public const string DispatchIntervalSeconds = "dispatch.intervalSeconds";
+    
+    // Priority escalation
+    public const string PriorityEscalationMinutes = "task.priorityEscalationMinutes";
 }

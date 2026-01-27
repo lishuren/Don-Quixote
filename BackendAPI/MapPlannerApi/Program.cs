@@ -66,6 +66,11 @@ builder.Services.AddScoped<ConfigRepository>();
 // Application services
 builder.Services.AddScoped<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddScoped<IDispatchEngine, DispatchEngine>();
+builder.Services.AddScoped<IEventTriggerService, EventTriggerService>();
+
+// Background services for monitoring
+builder.Services.AddHostedService<RobotMonitorService>();
+builder.Services.AddHostedService<DispatchBackgroundService>();
 
 // HTTP client for webhook calls
 builder.Services.AddHttpClient();
@@ -156,6 +161,8 @@ app.MapDashboardEndpoints();
 app.MapDispatchEndpoints();
 app.MapSimulationEndpoints();
 app.MapIntegrationEndpoints();
+app.MapGroup("/api/kitchen").MapKitchenEndpoints();
+app.MapGroup("/api/events").MapEventEndpoints();
 
 // SignalR hub for real-time events
 app.MapHub<RestaurantHub>("/hubs/restaurant");

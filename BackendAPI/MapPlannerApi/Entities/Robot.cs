@@ -54,6 +54,9 @@ public class Robot
     /// <summary>Last time position was updated</summary>
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 
+    /// <summary>Last heartbeat timestamp from robot</summary>
+    public DateTime? LastHeartbeat { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>All tasks assigned to this robot</summary>

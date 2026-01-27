@@ -8,6 +8,10 @@ public enum TaskType
     Return,
     Charge,
     Patrol,
+    Escort,
+    Greeting,
+    Service,
+    Cleaning,
     Custom
 }
 
@@ -73,7 +77,11 @@ public class RobotTask
     /// <summary>Number of retry attempts</summary>
     public int RetryCount { get; set; }
 
+    /// <summary>Maximum retries allowed (0 = unlimited)</summary>
+    public int MaxRetryCount { get; set; } = 3;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? AssignedAt { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 }
