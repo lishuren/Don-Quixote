@@ -3,6 +3,8 @@ using MapPlannerApi.Dtos;
 using MapPlannerApi.Entities;
 using MapPlannerApi.Services;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
+using System.Text.Json;
 
 namespace MapPlannerApi.Endpoints;
 
@@ -50,22 +52,55 @@ public static class RobotEndpoints
         .WithName("GetRobot")
         .WithDescription("Get robot by ID");
 
-        // POST /api/robots - Create a new robot
-        group.MapPost("/", async (CreateRobotRequest request, RobotRepository repo) =>
+        // POST /api/robots - Create one or more robots
+        group.MapPost("/", async (HttpRequest http, RobotRepository repo) =>
         {
-            var robot = new Robot
+            string body;
+            try
             {
-                Name = request.Name,
-                Model = request.Model,
-                IsEnabled = request.IsEnabled,
-                Position = request.Position?.ToEntity() ?? new Position()
-            };
+                using var reader = new StreamReader(http.Body);
+                body = await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "Failed to read request body.", details = ex.Message });
+            }
 
-            var created = await repo.CreateAsync(robot);
-            return Results.Created($"/api/robots/{created.Id}", ToDto(created));
+            List<CreateRobotRequest>? requests = null;
+            try
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                requests = JsonSerializer.Deserialize<List<CreateRobotRequest>>(body, opts);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "Invalid JSON for CreateRobotRequest[]", details = ex.Message, raw = body });
+            }
+
+            if (requests == null || requests.Count == 0)
+                return Results.BadRequest(new { error = "Request must be a non-empty array of CreateRobotRequest objects.", raw = body });
+
+            var createdList = new List<Robot>();
+            foreach (var request in requests)
+            {
+                var robot = new Robot
+                {
+                    Name = string.IsNullOrWhiteSpace(request.Name) ? $"Robot-{Guid.NewGuid().ToString()[..8]}" : request.Name,
+                    Model = request.Model,
+                    IsEnabled = request.IsEnabled,
+                    Position = request.Position?.ToEntity() ?? new Position()
+                };
+
+                var created = await repo.CreateAsync(robot);
+                createdList.Add(created);
+            }
+
+            // Return created robots
+            var dtos = createdList.Select(ToDto).ToList();
+            return Results.Ok(dtos);
         })
-        .WithName("CreateRobot")
-        .WithDescription("Create a new robot");
+        .WithName("CreateRobots")
+        .WithDescription("Create one or more robots");
 
         // PUT /api/robots/{id} - Update robot
         group.MapPut("/{id:int}", async (int id, UpdateRobotRequest request, RobotRepository repo) =>

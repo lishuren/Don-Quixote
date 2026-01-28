@@ -57,6 +57,18 @@ public class RobotRepository
     {
         robot.CreatedAt = DateTime.UtcNow;
         robot.LastUpdated = DateTime.UtcNow;
+
+        // Ensure robot name is unique (SQLite has UNIQUE constraint on Name)
+        var baseName = string.IsNullOrWhiteSpace(robot.Name) ? $"Robot-{Guid.NewGuid().ToString()[..8]}" : robot.Name;
+        var candidate = baseName;
+        int suffix = 1;
+        while (await _db.Robots.AnyAsync(r => r.Name == candidate))
+        {
+            candidate = baseName + "-" + suffix.ToString();
+            suffix++;
+        }
+        robot.Name = candidate;
+
         _db.Robots.Add(robot);
         await _db.SaveChangesAsync();
         return robot;

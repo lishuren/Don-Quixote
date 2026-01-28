@@ -65,11 +65,11 @@ builder.Services.AddScoped<ReservationRepository>();
 builder.Services.AddScoped<ConfigRepository>();
 
 // Application services
-builder.Services.AddScoped<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddScoped<IDispatchEngine, DispatchEngine>();
 builder.Services.AddScoped<IEventTriggerService, EventTriggerService>();
 
 // Simulation services (singletons for long-running simulations)
+builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
 builder.Services.AddSingleton<ISimulationClock, SimulationClock>();
 builder.Services.AddSingleton<IRestaurantEventGenerator, RestaurantEventGenerator>();
 builder.Services.AddSingleton<ISimulationMetricsAggregator, SimulationMetricsAggregator>();
@@ -111,51 +111,8 @@ if (app.Environment.IsDevelopment())
 // Basic health probe for monitoring pipelines
 app.MapGet("/api/health", () => new { status = "ok", version = "1.0.0" });
 
-// ===== Legacy Map/Planning Endpoints (kept for backward compatibility) =====
-
-// Retrieve the currently cached map and version
-app.MapGet("/api/map", (MapStore store) =>
-{
-    var map = store.GetMap();
-    
-    if (map is null)
-    {
-        return Results.NotFound(new { error = "No map uploaded. Call POST /api/map first." });
-    }
-    return Results.Ok(new { mapId = store.CurrentMapId, map });
-})
-.WithName("GetMap")
-.WithTags("Map");
-
-// Store a new map snapshot and refresh the version
-app.MapPost("/api/map", (MapPayload payload, MapStore store) =>
-{
-    store.SetMap(payload);
-    store.Refresh();
-    return Results.Ok(new { message = "Map received", mapId = store.CurrentMapId });
-})
-.WithName("PostMap")
-.WithTags("Map");
-
-// Run A* path planning for the given request
-app.MapPost("/api/plan", (PlanRequest request, MapStore store, PathPlanner planner) =>
-{
-    var map = store.GetMap();
-    if (map is null)
-    {
-        return Results.BadRequest(new { error = "No map uploaded. Call /api/map first." });
-    }
-
-    var result = planner.Plan(map, request);
-
-    if (!result.Success)
-    {
-        return Results.BadRequest(new { error = result.Error ?? "Planning failed" });
-    }
-    return Results.Ok(result);
-})
-.WithName("PlanRoute")
-.WithTags("Map");
+// Map endpoints for map upload/plan moved to MapEndpoints
+app.MapMapEndpoints();
 
 // ===== New API Endpoints =====
 app.MapRobotEndpoints();

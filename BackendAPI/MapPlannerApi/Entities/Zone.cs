@@ -12,8 +12,9 @@ public enum ZoneType
     Storage,
     Charging,
     Corridor,
-    Restricted
+    Restricted,
 }
+    // removed Table per new design
 
 /// <summary>
 /// Represents a zone/area in the restaurant floor plan.

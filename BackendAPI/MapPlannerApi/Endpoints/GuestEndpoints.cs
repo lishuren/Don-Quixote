@@ -1,6 +1,8 @@
 using MapPlannerApi.Data;
 using MapPlannerApi.Dtos;
 using MapPlannerApi.Entities;
+using System.IO;
+using System.Text.Json;
 
 namespace MapPlannerApi.Endpoints;
 
@@ -30,24 +32,56 @@ public static class GuestEndpoints
         .WithName("GetGuest")
         .WithDescription("Get guest by ID");
 
-        // POST /api/guests - Add a new guest (to waitlist)
-        group.MapPost("/", async (CreateGuestRequest request, GuestRepository repo) =>
+        // POST /api/guests - Add one or more guests to the waitlist
+        group.MapPost("/", async (HttpRequest http, GuestRepository repo) =>
         {
-            var guest = new Guest
+            string body;
+            try
             {
-                Name = request.Name,
-                PartySize = request.PartySize,
-                Notes = request.Notes,
-                PhoneNumber = request.PhoneNumber,
-                ReservationId = request.ReservationId,
-                Status = GuestStatus.Waiting
-            };
+                using var reader = new StreamReader(http.Body);
+                body = await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "Failed to read request body.", details = ex.Message });
+            }
 
-            var created = await repo.CreateAsync(guest);
-            return Results.Created($"/api/guests/{created.Id}", ToDto(created));
+            List<CreateGuestRequest>? requests = null;
+            try
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                requests = JsonSerializer.Deserialize<List<CreateGuestRequest>>(body, opts);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "Invalid JSON for CreateGuestRequest[]", details = ex.Message, raw = body });
+            }
+
+            if (requests == null || requests.Count == 0)
+                return Results.BadRequest(new { error = "Request must be a non-empty array of CreateGuestRequest objects.", raw = body });
+
+            var createdList = new List<Guest>();
+            foreach (var request in requests)
+            {
+                var guest = new Guest
+                {
+                    Name = request.Name,
+                    PartySize = request.PartySize,
+                    Notes = request.Notes,
+                    PhoneNumber = request.PhoneNumber,
+                    ReservationId = request.ReservationId,
+                    Status = GuestStatus.Waiting
+                };
+
+                var created = await repo.CreateAsync(guest);
+                createdList.Add(created);
+            }
+
+            var dtos = createdList.Select(ToDto).ToList();
+            return Results.Ok(dtos);
         })
-        .WithName("CreateGuest")
-        .WithDescription("Add a new guest to the waitlist");
+        .WithName("CreateGuests")
+        .WithDescription("Add one or more guests to the waitlist");
 
         // DELETE /api/guests/{id} - Remove guest
         group.MapDelete("/{id:int}", async (int id, GuestRepository repo) =>

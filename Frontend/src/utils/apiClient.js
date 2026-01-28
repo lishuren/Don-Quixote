@@ -2,7 +2,6 @@
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5199';
 
 export async function postMap(payload) {
-    debugger
   const res = await fetch(`${API_BASE}/api/map`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -25,5 +24,15 @@ export async function planRoute(request) {
 export async function getMap() {
   const res = await fetch(`${API_BASE}/api/map`);
   if (!res.ok) throw new Error(`getMap failed: ${res.status}`);
+  return res.json();
+}
+
+export async function postTables(tableList) {
+  const res = await fetch(`${API_BASE}/api/tables`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tableList),
+  });
+  if (!res.ok) throw new Error(`postTables failed: ${res.status}`);
   return res.json();
 }

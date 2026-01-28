@@ -206,6 +206,33 @@ public record CreateZoneRequest(
     double? SpeedLimit = null
 );
 
+// Map config related DTOs
+public record TableSizesDto(int t2, int t4, int t6, int t8);
+public record TableMixDto(int t2, int t4, int t6, int t8);
+public record DiningAreaDto(double X, double Y, double Width, double Height);
+
+public record MapConfigDto(
+    double MapWidth,
+    double MapHeight,
+    double MainAisle,
+    double MinorAisle,
+    double SafetyBuffer,
+    double SeatBuffer,
+    string TableShape,
+    TableSizesDto TableSizes,
+    TableMixDto TableMix,
+    int GridSize,
+    List<CreateZoneRequest>? Zones = null,
+    DiningAreaDto? DiningArea = null,
+    List<CreateTableRequest>? Tables = null
+);
+
+public record MapEntitiesDto(
+    List<ZoneDto> Zones,
+    List<TableDto> Tables,
+    MapConfigDto? MapConfig = null
+);
+
 // ========== Checkpoint DTOs ==========
 public record CheckpointDto(
     int Id,

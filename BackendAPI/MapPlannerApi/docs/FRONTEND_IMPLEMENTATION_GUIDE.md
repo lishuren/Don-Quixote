@@ -32,7 +32,7 @@
 │  - RobotMap    │  - robots       │  - apiClient             │
 │  - ControlPanel│  - tables       │  - signalRService        │
 │  - Dashboard   │  - tasks        │  - simulationService     │
-│  - Alerts      │  - alerts       │                          │
+│  - Alerts      │  - alerts       │                          |
 └────────┬────────────────┬────────────────────┬──────────────┘
          │                │                    │
          │  HTTP/REST     │  SignalR WebSocket │
@@ -86,6 +86,7 @@ type AlertSeverity = "Info" | "Warning" | "Error" | "Critical";
 
 // Zone
 type ZoneType = "Dining" | "Kitchen" | "Charging" | "Entrance" | "Restroom";
+
 ```
 
 ### Robot DTOs
@@ -452,6 +453,16 @@ interface SimulationReportSummaryDto {
 }
 ```
 
+### kitchenTask
+``` typescript
+interface kitchenTaskDto {
+  id: string;
+  tableId: number;
+  orderId: string;
+  items: string[];
+  status: "Pending" | "InProgress" | "Completed" | "Cancelled";
+}
+```
 ---
 
 ## 3. API Client Setup
@@ -564,7 +575,7 @@ export const robotsApi = {
   // Delete robot
   delete: (id: number) => apiClient.delete(`/api/robots/${id}`),
 
-  // Get by status
+  // Get robot by status
   getByStatus: (status: RobotStatus) =>
     apiClient.get<RobotDto[]>(`/api/robots/status/${status}`),
 
@@ -683,8 +694,8 @@ export const guestsApi = {
 
   delete: (id: number) => apiClient.delete(`/api/guests/${id}`),
 
-  // Waitlist
-  getWaitlist: () => apiClient.get<WaitlistSummary>('/api/guests/waitlist'),
+  // WaitList
+  getWaitList: () => apiClient.get<WaitlistSummary>('/api/guests/waitlist'),
 
   // Seat guest at table
   seat: (guestId: number, tableId: number) =>
@@ -787,16 +798,16 @@ export const eventsApi = {
 // src/services/kitchenApi.ts
 export const kitchenApi = {
   // Food ready for delivery
-  foodReady: (tableId: number, items?: string[]) =>
-    apiClient.post('/api/kitchen/food-ready', { tableId, items }),
+  foodReady: (tableId: number, orderId?: string, items?: string[]) =>
+    apiClient.post('/api/kitchen/food-ready', { tableId, orderId, items }),
 
   // Drinks ready
-  drinksReady: (tableId: number) =>
-    apiClient.post('/api/kitchen/drinks-ready', { tableId }),
+  drinksReady: (tableId: number, orderId?: string, items?: string[]) =>
+    apiClient.post('/api/kitchen/drinks-ready', { tableId, orderId, items }),
 
   // Generic order ready
-  orderReady: (tableId: number, orderId?: string) =>
-    apiClient.post('/api/kitchen/order-ready', { tableId, orderId }),
+  orderReady: (tableId: number, orderId?: string, note?: string, isRush?: boolean) =>
+    apiClient.post('/api/kitchen/order-ready', { tableId, orderId, note, isRush }),
 };
 ```
 
@@ -1114,7 +1125,253 @@ export function useSignalR() {
 
 ---
 
-## 6. Business Scenarios
+## 6. kitchenQueue implementation
+
+```typescript
+
+export type TaskStatus = 'pending' | 'complete';
+export type TableId = number;
+
+export interface BaseTask<TItem extends string = string> {
+  id: string;
+  orderId: string;     // ORD-YYYY-MMDD-####
+  tableId: TableId;
+  items: TItem[];      //food or drink items
+  status: TaskStatus;
+  createdAt: number;
+}
+
+
+export interface QueueOptions<TTask extends BaseTask = BaseTask> {
+  // 1min default
+  intervalMs?: number;
+}
+
+export type TableStatus = 'available';
+
+const genId = () =>
+  (crypto as any)?.randomUUID?.() ?? `t_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+const seqByDay = new Map<string, number>();
+
+function nextDailyIndex(date = new Date()): string {
+  const y = date.getFullYear();
+  const mm = `${date.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${date.getDate()}`.padStart(2, '0');
+  const key = `${y}${mm}${dd}`;
+  const next = (seqByDay.get(key) ?? 0) + 1;
+  seqByDay.set(key, next);
+  return `${next}`.padStart(4, '0');
+}
+
+/**  OrderId：ORD-YYYY-MMDD-####（{md} = MMDD） */
+export function generateOrderId(date = new Date()): string {
+  const year = date.getFullYear();
+  const mm = `${date.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${date.getDate()}`.padStart(2, '0');
+  const md = `${mm}${dd}`;
+  const index = nextDailyIndex(date);
+  return `ORD-${year}-${md}-${index}`;
+}
+
+export enum FoodItem {
+  SteakMediumRare = 'Steak medium-rare',
+  CaesarSalad = 'Caesar salad',
+  MargheritaPizza = 'Margherita pizza',
+  GrilledSalmon = 'Grilled salmon',
+  MushroomRisotto = 'Mushroom risotto',
+  SpaghettiBolognese = 'Spaghetti bolognese',
+}
+
+export enum DrinkItem {
+  Latte = 'Latte',
+  Cappuccino = 'Cappuccino',
+  IcedTea = 'Iced tea',
+  OrangeJuice = 'Orange juice',
+  SparklingWater = 'Sparkling water',
+  Cola = 'Cola',
+}
+
+
+export interface FoodTask extends BaseTask<FoodItem | string> {}
+export interface DrinkTask extends BaseTask<DrinkItem | string> {}
+export interface CleanTask extends BaseTask<string> {} 
+
+
+class BaseQueue<TTask extends BaseTask> {
+  protected q: TTask[] = [];
+  private timer: number | null = null;
+  private running = false;
+
+  constructor(
+    private readonly opts: QueueOptions<TTask>,
+    private readonly onReadyApi: (task: TTask) => Promise<any>
+  ) {}
+
+  enqueue(input: Omit<TTask, 'id' | 'status' | 'createdAt' | 'orderId'> & { orderId?: string }): TTask {
+    const task = {
+      id: genId(),
+      orderId: input.orderId ?? generateOrderId(),
+      status: 'pending' as const,
+      createdAt: Date.now(),
+      ...input,
+      items: Array.isArray((input as any).items) ? (input as any).items : [],
+    } as TTask;
+
+    this.q.push(task);
+    return task;
+  }
+
+  protected async processOne() {
+    if (!this.q.length) return;
+    const idx = this.q.findIndex(t => t.status === 'pending');
+    if (idx === -1) return;
+
+    const task = this.q[idx];
+
+    await this.onReadyApi(task);
+    task.status = 'complete';
+    this.q.splice(idx, 1);
+  }
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+
+    const interval = this.opts.intervalMs ?? 60_000;
+    this.timer = window.setInterval(() => {
+      void this.processOne();
+    }, interval);
+  }
+
+  stop() {
+    this.running = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  clear() {
+    this.q = [];
+  }
+
+  size() {
+    return this.q.length;
+  }
+
+  snapshot(): ReadonlyArray<TTask> {
+    return this.q.slice();
+  }
+}
+
+export class FoodQueue extends BaseQueue<FoodTask> {
+  constructor(api: apiClient, opts: QueueOptions<FoodTask> = {}) {
+    super(
+      { intervalMs: opts.intervalMs ?? 60_000 },
+      (task) => api.foodReady(task.tableId, task.orderId, task.items)
+    );
+  }
+}
+
+export class DrinkQueue extends BaseQueue<DrinkTask> {
+  constructor(api: apiClient, opts: QueueOptions<DrinkTask> = {}) {
+    super(
+      { intervalMs: opts.intervalMs ?? 60_000 },
+      (task) => api.drinksReady(task.tableId, task.orderId, task.items)
+    );
+  }
+}
+
+export class CleanQueue extends BaseQueue<CleanTask> {
+  constructor(api: apiClient, opts: QueueOptions<CleanTask> = {}) {
+    super(
+      { intervalMs: opts.intervalMs ?? 30_000 }, // 30s
+      (task) => api.tableStatusChange(task.tableId, 'available')
+    );
+  }
+}
+
+export class TableOrderRegistry {
+  private map = new Map<TableId, string>();
+
+  getOrCreate(tableId: TableId): string {
+    const existing = this.map.get(tableId);
+    if (existing) return existing;
+    const fresh = generateOrderId();
+    this.map.set(tableId, fresh);
+    return fresh;
+  }
+
+  startNew(tableId: TableId): string {
+    const fresh = generateOrderId();
+    this.map.set(tableId, fresh);
+    return fresh;
+  }
+
+  end(tableId: TableId) {
+    this.map.delete(tableId);
+  }
+}
+
+export class KitchenManager {
+  constructor(
+    private readonly api: KitchenApi,
+    public readonly foodQ  = new FoodQueue(api),
+    public readonly drinkQ = new DrinkQueue(api),
+    public readonly cleanQ = new CleanQueue(api),
+    private readonly orders = new TableOrderRegistry()
+  ) {}
+
+  startAll() { this.foodQ.start(); this.drinkQ.start(); this.cleanQ.start(); }
+  stopAll()  { this.foodQ.stop();  this.drinkQ.stop();  this.cleanQ.stop();  }
+
+  placeOrder(tableId: TableId, foodItems: (FoodItem | string)[], drinkItems: (DrinkItem | string)[]) {
+    const orderId = this.orders.getOrCreate(tableId); 
+    const foodTask  = this.foodQ.enqueue({ orderId, tableId, items: foodItems });
+    const drinkTask = this.drinkQ.enqueue({ orderId, tableId, items: drinkItems });
+    return { orderId, foodTask, drinkTask };
+  }
+
+  enqueueFood(tableId: TableId, items: (FoodItem | string)[], orderId?: string) {
+    const oid = orderId ?? this.orders.getOrCreate(tableId);
+    return this.foodQ.enqueue({ orderId: oid, tableId, items });
+  }
+
+  enqueueDrink(tableId: TableId, items: (DrinkItem | string)[], orderId?: string) {
+    const oid = orderId ?? this.orders.getOrCreate(tableId);
+    return this.drinkQ.enqueue({ orderId: oid, tableId, items });
+  }
+  startNewOrder(tableId: TableId): string {
+    return this.orders.startNew(tableId);
+  }
+
+  scheduleClean(tableId: TableId) {
+    return this.cleanQ.enqueue({ tableId, items: [] });
+  }
+}
+
+/* ===================== use case =====================
+
+const km = new KitchenManager(api);
+// A：Food and Drink share orderId
+km.placeOrder(1, [FoodItem.SteakMediumRare, FoodItem.CaesarSalad], [DrinkItem.Latte, DrinkItem.Cola]);
+
+// B： Separate Food and Drink orders
+km.enqueueFood(2, [FoodItem.MargheritaPizza]);
+km.enqueueDrink(2, [DrinkItem.SparklingWater]);
+
+km.startNewOrder(2);
+
+km.scheduleClean(3);
+
+*/
+
+
+```
+
+
+## 7. Business Scenarios
 
 ### Scenario 1: Guest Arrival → Food Delivery Flow
 ```typescript
@@ -1128,12 +1385,14 @@ async function handleGuestArrival(partySize: number, guestName?: string) {
   // SignalR will notify: TaskStatusChanged (Pending → Assigned)
   // SignalR will notify: RobotStatusChanged (Idle → Navigating)
 }
+  // 3. stay a few seconds to simulate order preparation time (about 5s), also can be speed by acceleration setting
+  // 4. add the order to a global queue and call kitchenApi.foodReady when done
 
 async function handleFoodReady(tableId: number) {
-  // 3. Kitchen signals food is ready (creates Deliver task)
+  // 5. Kitchen signals food is ready (creates Deliver task)
   await kitchenApi.foodReady(tableId);
   
-  // 4. Auto-dispatch assigns available robot
+  // 6. Auto-dispatch assigns available robot
   // Robot delivers food
   // SignalR notifies completion
 }
@@ -1157,6 +1416,7 @@ async function manuallyAssignTask(taskId: number, robotId: number) {
 
 ### Scenario 3: Emergency Stop
 ```tsx
+
 function EmergencyButton() {
   const [isStopped, setIsStopped] = useState(false);
 
@@ -1171,17 +1431,12 @@ function EmergencyButton() {
   };
 
   return (
-    <div>
-      {isStopped ? (
-        <button onClick={handleResume} className="btn-success">
-          Resume Operations
-        </button>
-      ) : (
-        <button onClick={handleEmergencyStop} className="btn-danger">
-          🚨 EMERGENCY STOP
-        </button>
-      )}
-    </div>
+    <VegaButton 
+      icon={isPaused ? "fa-solid fa-play" : "fa-solid fa-pause"} 
+      label={isPaused ? "Resume Operations" : "EMERGENCY STOP"}
+      variant="secondary"
+      onVegaClick={onPause}
+    />   
   );
 }
 ```
@@ -1235,6 +1490,7 @@ async function seatNextGuest(tableId: number) {
 async function checkoutGuest(guestId: number) {
   await guestsApi.checkout(guestId);
   // Table status automatically changes to "Cleaning"
+  // add the cleaning task to a cleaning queue, every cleaning task takes about 2 minutes by default, and can be seeped up by acceleration setting
 }
 ```
 
@@ -1256,14 +1512,16 @@ function Dashboard() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        setLoading(true);
+        const loader = VegaLoader.load({
+          containerSelector: '#dashboard-container' // dashboard-container is the id of the div where the loader will be shown
+        })
         const data = await dashboardApi.getSummary();
         setSummary(data);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard');
       } finally {
-        setLoading(false);
+        VegaLoader.close(loader);
       }
     };
 
@@ -1272,12 +1530,11 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div>Loading...</div>;
   if (error) return <div className="error">{error}</div>;
   if (!summary) return null;
 
   return (
-    <div className="dashboard-grid">
+    <div className="dashboard-grid" id="dashboard-container">
       {/* Robots Card */}
       <div className="card">
         <h3>Robots</h3>

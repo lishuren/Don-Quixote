@@ -1,4 +1,3 @@
-import { getTablePlacementBounds } from './layoutGenerator.js';
 
 export function buildMapPayload(config, tables) {
   const { diningArea, zones, gridSize } = config;
@@ -39,6 +38,7 @@ export function buildMapPayload(config, tables) {
 }
 
 export function defaultStartBottomRight(config) {
+  console.log("diningArea", diningArea);
   const { diningArea } = config;
   return { x: diningArea.x + diningArea.width - 2, y: diningArea.y + diningArea.height - 2 };
 }

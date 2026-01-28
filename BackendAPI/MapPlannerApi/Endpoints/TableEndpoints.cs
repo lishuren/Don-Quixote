@@ -30,29 +30,36 @@ public static class TableEndpoints
         .WithName("GetTable")
         .WithDescription("Get table by ID");
 
-        // POST /api/tables - Create a new table
-        group.MapPost("/", async (CreateTableRequest request, TableRepository repo, ConfigRepository config) =>
+        // POST /api/tables - Create one or more new tables (only creates tables now)
+        group.MapPost("/", async (List<CreateTableRequest> tableList, TableRepository repo, ConfigRepository configRepo) =>
         {
-            Enum.TryParse<TableShape>(request.Shape, true, out var shape);
-            var pixelsPerMeter = await config.GetPixelsPerMeterAsync();
+            var createdTableDtos = new List<TableDto>();
+            var pixelsPerMeter = await configRepo.GetPixelsPerMeterAsync();
 
-            var table = new TableEntity
+            foreach (var request in tableList)
             {
-                Label = request.Label,
-                Shape = shape,
-                Center = request.Center?.ToEntity() ?? new Position(),
-                Width = request.Width,
-                Height = request.Height,
-                Rotation = request.Rotation,
-                Capacity = request.Capacity,
-                ZoneId = request.ZoneId
-            };
+                Enum.TryParse<TableShape>(request.Shape, true, out var shape);
 
-            var created = await repo.CreateAsync(table);
-            return Results.Created($"/api/tables/{created.Id}", ToDto(created));
+                var table = new TableEntity
+                {
+                    Label = request.Label,
+                    Shape = shape,
+                    Center = request.Center?.ToEntity() ?? new Position(),
+                    Width = request.Width,
+                    Height = request.Height,
+                    Rotation = request.Rotation,
+                    Capacity = request.Capacity,
+                    ZoneId = request.ZoneId
+                };
+
+                var created = await repo.CreateAsync(table);
+                createdTableDtos.Add(ToDto(created));
+            }
+
+            return Results.Ok(new { tables = createdTableDtos });
         })
-        .WithName("CreateTable")
-        .WithDescription("Create a new table");
+        .WithName("CreateTables")
+        .WithDescription("Create one or more tables");
 
         // PUT /api/tables/{id} - Update table
         group.MapPut("/{id:int}", async (int id, UpdateTableRequest request, TableRepository repo) =>
